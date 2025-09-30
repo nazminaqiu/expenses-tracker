@@ -210,7 +210,7 @@ const firebaseConfig = {
     <script>
         let allExpenses = [];
         let allCategories = [];
-        const presetIcons = [ '🏡', '💡', '💧', '🌐', '🛋️', '📺', '🚗', '⛽', '🛣️', '🅿️', '🔧', '📱', '🎬', '🎵', '🧸', '🍼', '🛒', '🧽', '💳', '📦', '🍴', '🛵', '🎮', '🎥', '⚽', '🎸', '🏥', '💊', '🏋️', '💰', '📈' ];
+        const presetIcons = [ '🏡', '💡', '💧', '🌐', '🛋️', '📺', '🚗', '⛽', '🛣️', '🅿️', '🔧', '📱', '🎬', '🎵', '🧸', '🍼', '🛒', '🧽', '💳', '📦', '🍴', '🛵', '🎮', '🎥', '⚽', '🎸', '🏥', '💊', '🏋️', '💰', '📈', '📶' ];
 
         async function addToDB(collectionName, data) {
             try { await fb.addDoc(fb.collection(db, collectionName), data); return true; } catch (error) { console.error(`Error adding to ${collectionName}:`, error); alert(`Failed to add ${collectionName.slice(0, -1)}.`); return false; }
