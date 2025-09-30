@@ -9,9 +9,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        // UPDATED: Added getDoc
         import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, deleteDoc, updateDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
-        // UPDATED: Added deleteObject
         import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
 
         // ==================================================================================
@@ -25,8 +23,7 @@ const firebaseConfig = {
     messagingSenderId: "717743221463",
     appId: "1:717743221463:web:d574feaf383b06a380de92",
     measurementId: "G-VN0F315CZF"
-  };
-          // ==================================================================================
+  };        // ==================================================================================
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
@@ -34,7 +31,6 @@ const firebaseConfig = {
 
         window.db = db;
         window.storage = storage;
-        // UPDATED: Added getDoc and deleteObject to the global helper
         window.fb = { collection, addDoc, onSnapshot, doc, getDoc, deleteDoc, updateDoc, query, orderBy, ref, uploadBytesResumable, getDownloadURL, deleteObject };
     </script>
 
@@ -108,12 +104,49 @@ const firebaseConfig = {
         .icon-preset { font-size: 24px; padding: 10px; border: 2px solid #e1e8ed; border-radius: 10px; cursor: pointer; transition: all 0.2s ease; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; }
         .icon-preset:hover { transform: scale(1.1); border-color: #a29bfe; }
         .icon-preset.selected { border-color: #667eea; background-color: rgba(102, 126, 234, 0.1); transform: scale(1.1); }
-
+        
+        /* NEW: Class for category breakdown items for better mobile styling */
+        .category-breakdown-item { display: flex; justify-content: space-between; align-items: center; }
+        .category-actions { display: flex; gap: 10px; align-items: center; }
+        
         @media (max-width: 768px) {
+            .container { padding: 0 10px; }
+            .content { padding: 20px 15px; }
             .header h1 { font-size: 1.8em; }
             .summary-cards { grid-template-columns: 1fr; }
-            .expense-header { flex-direction: column; gap: 10px; }
-            .tabs { overflow-x: auto; }
+            .expense-header { flex-direction: column; gap: 10px; align-items: flex-start; }
+            .tabs { 
+                overflow-x: auto; 
+                -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+            }
+            .tabs::-webkit-scrollbar { height: 4px; }
+            .tabs::-webkit-scrollbar-thumb { background: #dcdde1; border-radius: 2px; }
+            .tab { flex-shrink: 0; min-width: 120px; }
+            
+            /* NEW: Stack category breakdown items on mobile */
+            .category-breakdown-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+            .category-breakdown-item > div:first-child { width: 100%; } /* Make category/progress bar full width */
+
+            /* NEW: Stack buttons in "Your Categories" list on mobile */
+            .custom-category-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .category-actions {
+                width: 100%;
+                margin-top: 15px;
+                flex-direction: column-reverse; /* Put delete below edit for easier reach */
+                align-items: stretch; /* Make buttons full width */
+                gap: 10px;
+            }
+            .category-actions .btn, .category-actions .delete-btn {
+                margin: 0;
+                text-align: center;
+            }
         }
     </style>
 </head>
@@ -222,14 +255,10 @@ const firebaseConfig = {
             try { await fb.addDoc(fb.collection(db, collectionName), data); return true; } catch (error) { console.error(`Error adding to ${collectionName}:`, error); alert(`Failed to add ${collectionName.slice(0, -1)}.`); return false; }
         }
 
-        // --- UPDATED deleteFromDB FUNCTION ---
         async function deleteFromDB(collectionName, id) {
             if (isViewOnlyMode) return;
             if (!confirm(`Are you sure you want to delete this ${collectionName.slice(0, -1)}?`)) return;
-
             const docRef = fb.doc(db, collectionName, id);
-
-            // NEW LOGIC: If it's an expense, check for and delete the associated receipt
             if (collectionName === 'expenses') {
                 try {
                     const docSnap = await fb.getDoc(docRef);
@@ -240,17 +269,10 @@ const firebaseConfig = {
                         console.log("Associated receipt deleted from Storage.");
                     }
                 } catch (error) {
-                    // Log error but don't block the deletion of the database entry
-                    console.error("Could not delete receipt file. It may have been already deleted or the URL is incorrect.", error);
+                    console.error("Could not delete receipt file.", error);
                 }
             }
-            
-            // Proceed to delete the document from Firestore
-            try {
-                await fb.deleteDoc(docRef);
-            } catch (error) {
-                console.error(`Error deleting document from ${collectionName}:`, error);
-            }
+            try { await fb.deleteDoc(docRef); } catch (error) { console.error(`Error deleting document from ${collectionName}:`, error); }
         }
 
         function listenForCategories() {
@@ -363,12 +385,12 @@ const firebaseConfig = {
                     <button class="btn" style="padding: 8px 16px; margin-top: 0; background: #ffc107;" onclick="showEditModal('${cat.id}', '${cat.name}', '${cat.icon}')">Edit</button>
                     <button class="delete-btn" style="margin-top: 0;" onclick="deleteFromDB('categories', '${cat.id}')">Delete</button>`;
                 return `
-                <div class="expense-item" style="display: flex; justify-content: space-between; align-items: center;">
+                <div class="expense-item custom-category-item" style="display: flex; justify-content: space-between; align-items: center;">
                     <div>
                         <span style="font-size: 24px; margin-right: 15px;">${cat.icon}</span>
                         <span style="font-weight: 600;">${cat.name}</span>
                     </div>
-                    <div style="display:flex; gap: 10px; align-items:center;">${actionButtons}</div>
+                    <div class="category-actions">${actionButtons}</div>
                 </div>`;
             }).join('');
         }
@@ -388,7 +410,7 @@ const firebaseConfig = {
                 list.innerHTML = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]).map(([name, amount]) => {
                     const pct = totalAmount > 0 ? (amount / totalAmount * 100).toFixed(1) : 0;
                     const icon = allCategories.find(c => c.name === name)?.icon || '📌';
-                    return `<div class="expense-item" style="display: flex; justify-content: space-between; align-items: center;"><div style="display: flex; align-items: center; gap: 15px;"><span class="expense-category">${icon} ${name}</span><div style="width: 200px; height: 8px; background: #e1e8ed; border-radius: 4px; overflow: hidden;"><div style="width: ${pct}%; height: 100%; background: linear-gradient(90deg, #667eea, #764ba2);"></div></div></div><div><span style="font-weight: 700;">RM ${amount.toFixed(2)}</span><span style="color: #8898aa; font-size: 14px;"> (${pct}%)</span></div></div>`;
+                    return `<div class="expense-item category-breakdown-item"><div style="display: flex; align-items: center; gap: 15px;"><span class="expense-category">${icon} ${name}</span><div style="width: 200px; height: 8px; background: #e1e8ed; border-radius: 4px; overflow: hidden;"><div style="width: ${pct}%; height: 100%; background: linear-gradient(90deg, #667eea, #764ba2);"></div></div></div><div><span style="font-weight: 700;">RM ${amount.toFixed(2)}</span><span style="color: #8898aa; font-size: 14px;"> (${pct}%)</span></div></div>`;
                 }).join('');
             }
         }
