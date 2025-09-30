@@ -15,14 +15,14 @@
         // ====> ACTION: PASTE YOUR FIREBASE CONFIGURATION OBJECT FROM THE FIREBASE CONSOLE HERE
         // ==================================================================================
         const firebaseConfig = {
-            apiKey: "AIzaSyAgEXmz8rUKAUFFukKgKKromV03okUmfFQ",
-            authDomain: "expenses-tracker-8725f.firebaseapp.com",
-            projectId: "expenses-tracker-8725f",
-            storageBucket: "expenses-tracker-8725f.firebasestorage.app",
-            messagingSenderId: "717743221463",
-            appId: "1:717743221463:web:d574feaf383b06a380de92",
-            measurementId: "G-VN0F315CZF"
-        };
+    apiKey: "AIzaSyAgEXmz8rUKAUFFukKgKKromV03okUmfFQ",
+    authDomain: "expenses-tracker-8725f.firebaseapp.com",
+    projectId: "expenses-tracker-8725f",
+    storageBucket: "expenses-tracker-8725f.firebasestorage.app",
+    messagingSenderId: "717743221463",
+    appId: "1:717743221463:web:d574feaf383b06a380de92",
+    measurementId: "G-VN0F315CZF"
+  };
         // ==================================================================================
 
         // Initialize Firebase and Firestore
@@ -35,7 +35,6 @@
     </script>
 
     <style>
-        /* All your existing CSS goes here. No changes needed. */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; }
@@ -90,6 +89,37 @@
         .no-expenses { text-align: center; padding: 60px 20px; color: #8898aa; }
         .no-expenses-icon { font-size: 48px; margin-bottom: 20px; opacity: 0.5; }
         .export-btn { background: linear-gradient(135deg, #00b894, #00cec9); margin-left: 10px; }
+        
+        /* Styles for the new preset icon grid */
+        #icon-preset-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .icon-preset {
+            font-size: 24px;
+            padding: 10px;
+            border: 2px solid #e1e8ed;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .icon-preset:hover {
+            transform: scale(1.1);
+            border-color: #a29bfe;
+        }
+        .icon-preset.selected {
+            border-color: #667eea;
+            background-color: rgba(102, 126, 234, 0.1);
+            transform: scale(1.1);
+        }
+
         @media (max-width: 768px) {
             .header h1 { font-size: 1.8em; }
             .summary-cards { grid-template-columns: 1fr; }
@@ -99,7 +129,6 @@
     </style>
 </head>
 <body>
-    <!-- All your HTML structure is here. No changes needed. -->
     <div class="container">
         <div class="header">
             <h1>💰 Monthly Expense Tracker</h1>
@@ -160,9 +189,7 @@
                         </select>
                         <button class="btn export-btn" onclick="exportData()">📊 Export Data</button>
                     </div>
-                    <div class="expenses-list" id="expenses-list">
-                        <!-- Expenses will be dynamically loaded here -->
-                    </div>
+                    <div class="expenses-list" id="expenses-list"></div>
                 </div>
 
                 <!-- Summary Tab -->
@@ -195,14 +222,17 @@
                             <input type="text" id="category-name" placeholder="e.g., Groceries" required>
                         </div>
                         <div class="form-group">
-                            <label for="category-icon">Category Icon (Emoji)</label>
-                            <input type="text" id="category-icon" placeholder="e.g., 🛒" required>
+                            <label>Choose an Icon</label>
+                            <div id="icon-preset-grid">
+                                <!-- Preset icons will be populated here by JavaScript -->
+                            </div>
+                            <!-- Hidden input to store the selected icon's value -->
+                            <input type="hidden" id="selected-icon" required>
                         </div>
                         <button type="submit" class="btn">Add Category</button>
                     </form>
                     <div class="expenses-list" id="custom-categories-list" style="margin-top: 30px;">
                         <h3 style="margin-bottom: 20px; color: #2c3e50;">Your Categories</h3>
-                        <!-- Custom categories will be listed here -->
                     </div>
                 </div>
             </div>
@@ -214,10 +244,10 @@
         // Global variables to hold data from Firestore
         let allExpenses = [];
         let allCategories = [];
+        const presetIcons = ['🍔', '🚗', '💡', '🎬', '🛍️', '🏥', '📌', '🛒', '✈️', '🏠', '🎁', '🎓', '☕', '💪', '🐶', '💸'];
 
         // --- DATABASE INTERACTION FUNCTIONS ---
 
-        // Add a new document to a Firestore collection
         async function addToDB(collectionName, data) {
             try {
                 await fb.addDoc(fb.collection(db, collectionName), data);
@@ -229,7 +259,6 @@
             }
         }
 
-        // Delete a document from a Firestore collection
         async function deleteFromDB(collectionName, id) {
             if (confirm(`Are you sure you want to delete this ${collectionName.slice(0, -1)}?`)) {
                 try {
@@ -240,7 +269,6 @@
             }
         }
 
-        // Listen for real-time updates to the CATEGORIES collection
         function listenForCategories() {
             const q = fb.query(fb.collection(db, "categories"), fb.orderBy("name", "asc"));
             fb.onSnapshot(q, (querySnapshot) => {
@@ -248,17 +276,14 @@
                 querySnapshot.forEach((doc) => {
                     categories.push({ id: doc.id, ...doc.data() });
                 });
-                allCategories = categories; // Update global variable
-                
-                // When categories change, update all UI elements that use them
+                allCategories = categories;
                 populateCategoryDropdown();
                 populateCategoryFilter();
                 displayCategories();
-                updateDisplay(); // Update expense list in case category icons changed
+                updateDisplay();
             });
         }
 
-        // Listen for real-time updates to the EXPENSES collection
         function listenForExpenses() {
             const q = fb.query(fb.collection(db, "expenses"), fb.orderBy("date", "desc"));
             fb.onSnapshot(q, (querySnapshot) => {
@@ -266,20 +291,17 @@
                 querySnapshot.forEach((doc) => {
                     expenses.push({ id: doc.id, ...doc.data() });
                 });
-                allExpenses = expenses; // Update global variable
-                updateDisplay(); // Re-render everything with the new data
+                allExpenses = expenses;
+                updateDisplay();
             });
         }
 
         // --- EVENT LISTENERS ---
 
-        // Handle expense form submission
         document.getElementById('expense-form').addEventListener('submit', async function(e) {
             e.preventDefault();
-
             const fileInput = document.getElementById('receipt');
             let receiptData = null;
-
             if (fileInput.files[0]) {
                 const file = fileInput.files[0];
                 const reader = new FileReader();
@@ -288,7 +310,6 @@
                     reader.readAsDataURL(file);
                 });
             }
-
             const expense = {
                 date: document.getElementById('date').value,
                 category: document.getElementById('category').value,
@@ -297,7 +318,6 @@
                 receipt: receiptData,
                 timestamp: new Date().toISOString()
             };
-
             const success = await addToDB("expenses", expense);
             if (success) {
                 this.reset();
@@ -307,50 +327,43 @@
             }
         });
 
-        // Handle category form submission
         document.getElementById('category-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             const categoryName = document.getElementById('category-name').value;
-            const categoryIcon = document.getElementById('category-icon').value;
-
-            if (!categoryName || !categoryIcon) return;
-
-            const newCategory = {
-                name: categoryName,
-                icon: categoryIcon,
-            };
-            
+            const categoryIcon = document.getElementById('selected-icon').value;
+            if (!categoryName || !categoryIcon) {
+                alert("Please enter a category name and select an icon.");
+                return;
+            }
+            const newCategory = { name: categoryName, icon: categoryIcon };
             const success = await addToDB("categories", newCategory);
             if (success) {
                 this.reset();
+                document.getElementById('selected-icon').value = '';
+                document.querySelector('.icon-preset.selected')?.classList.remove('selected');
                 alert('Category added successfully!');
             }
         });
 
         // --- UI RENDERING FUNCTIONS ---
         
-        // Update all displays
         function updateDisplay() {
-            filterExpenses(); // This eventually calls displayExpenses
+            filterExpenses();
             updateSummary();
             displayCategories();
             populateMonthFilter();
         }
 
-        // Display expenses in the "View Expenses" tab
         function displayExpenses(filteredExpenses = null) {
             const list = document.getElementById('expenses-list');
             const expensesToShow = filteredExpenses || allExpenses;
-            
             if (expensesToShow.length === 0) {
                 list.innerHTML = `<div class="no-expenses"><div class="no-expenses-icon">📭</div><p>No expenses found. Start tracking!</p></div>`;
                 return;
             }
-
             list.innerHTML = expensesToShow.map(expense => {
                 const category = allCategories.find(c => c.name === expense.category);
                 const categoryIcon = category ? category.icon : '📌';
-
                 return `
                 <div class="expense-item">
                     <div class="expense-header">
@@ -365,17 +378,13 @@
             }).join('');
         }
         
-        // Display custom categories in the "Categories" tab
         function displayCategories() {
             const list = document.getElementById('custom-categories-list');
-            // Clear previous list but keep the title
             list.innerHTML = '<h3 style="margin-bottom: 20px; color: #2c3e50;">Your Categories</h3>';
-
             if (allCategories.length === 0) {
                 list.innerHTML += `<p style="text-align: center; color: #8898aa;">No custom categories yet.</p>`;
                 return;
             }
-
             list.innerHTML += allCategories.map(cat => `
                 <div class="expense-item" style="display: flex; justify-content: space-between; align-items: center;">
                     <div>
@@ -387,29 +396,23 @@
             `).join('');
         }
 
-        // Update the "Summary" tab
         function updateSummary() {
             const totalAmount = allExpenses.reduce((sum, exp) => sum + exp.amount, 0);
             document.getElementById('total-amount').textContent = `RM ${totalAmount.toFixed(2)}`;
-
             const now = new Date();
             const monthExpenses = allExpenses.filter(exp => {
                 const expDate = new Date(exp.date);
                 return expDate.getMonth() === now.getMonth() && expDate.getFullYear() === now.getFullYear();
             });
-            
             const monthTotal = monthExpenses.reduce((sum, exp) => sum + exp.amount, 0);
             document.getElementById('month-amount').textContent = `RM ${monthTotal.toFixed(2)}`;
-
             const dailyAverage = monthTotal / now.getDate();
             document.getElementById('daily-average').textContent = `RM ${isNaN(dailyAverage) ? '0.00' : dailyAverage.toFixed(2)}`;
-
             const categoryTotals = {};
             allExpenses.forEach(exp => {
                 if (!categoryTotals[exp.category]) categoryTotals[exp.category] = 0;
                 categoryTotals[exp.category] += exp.amount;
             });
-
             const categoryList = document.getElementById('category-list');
             if (Object.keys(categoryTotals).length === 0) {
                 categoryList.innerHTML = '<p style="color: #8898aa;">No expenses to analyze</p>';
@@ -437,7 +440,23 @@
 
         // --- HELPER & UTILITY FUNCTIONS ---
 
-        // Populate category dropdown in "Add Expense" form
+        function populateIconGrid() {
+            const grid = document.getElementById('icon-preset-grid');
+            grid.innerHTML = '';
+            presetIcons.forEach(icon => {
+                const iconEl = document.createElement('div');
+                iconEl.classList.add('icon-preset');
+                iconEl.textContent = icon;
+                iconEl.dataset.icon = icon;
+                iconEl.addEventListener('click', () => {
+                    document.querySelectorAll('.icon-preset.selected').forEach(selected => selected.classList.remove('selected'));
+                    iconEl.classList.add('selected');
+                    document.getElementById('selected-icon').value = icon;
+                });
+                grid.appendChild(iconEl);
+            });
+        }
+
         function populateCategoryDropdown() {
             const select = document.getElementById('category');
             select.innerHTML = '<option value="">Select Category</option>';
@@ -446,7 +465,6 @@
             });
         }
 
-        // Populate category filter in "View Expenses" tab
         function populateCategoryFilter() {
             const select = document.getElementById('filter-category');
             select.innerHTML = '<option value="">All Categories</option>';
@@ -455,13 +473,10 @@
             });
         }
 
-        // Populate month filter based on available expenses
         function populateMonthFilter() {
             const select = document.getElementById('filter-month');
             const months = new Set(allExpenses.map(exp => exp.date.substring(0, 7)));
             const sortedMonths = Array.from(months).sort().reverse();
-            
-            // Preserve current selection if possible
             const currentVal = select.value;
             select.innerHTML = '<option value="">All Months</option>';
             sortedMonths.forEach(month => {
@@ -472,22 +487,15 @@
             select.value = currentVal;
         }
 
-        // Filter expenses based on dropdown selections
         function filterExpenses() {
             const month = document.getElementById('filter-month').value;
             const category = document.getElementById('filter-category').value;
-            
             let filtered = allExpenses;
-            if (month) {
-                filtered = filtered.filter(exp => exp.date.startsWith(month));
-            }
-            if (category) {
-                filtered = filtered.filter(exp => exp.category === category);
-            }
+            if (month) { filtered = filtered.filter(exp => exp.date.startsWith(month)); }
+            if (category) { filtered = filtered.filter(exp => exp.category === category); }
             displayExpenses(filtered);
         }
 
-        // Switch between tabs
         function switchTab(event, tabName) {
             document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
             event.currentTarget.classList.add('active');
@@ -496,13 +504,11 @@
             updateDisplay();
         }
 
-        // Format date string for display
         function formatDate(dateStr) {
             const date = new Date(dateStr);
             return date.toLocaleDateString('en-MY', { timeZone: 'UTC', year: 'numeric', month: 'long', day: 'numeric' });
         }
 
-        // Export data to a JSON file
         function exportData() {
             const dataStr = JSON.stringify({ expenses: allExpenses, categories: allCategories }, null, 2);
             const blob = new Blob([dataStr], { type: 'application/json' });
@@ -516,11 +522,9 @@
 
         // --- APP INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
-            // Start listening for real-time data from Firebase
+            populateIconGrid();
             listenForCategories();
             listenForExpenses();
-            
-            // Set default date for the form
             document.getElementById('date').valueAsDate = new Date();
         });
     </script>
