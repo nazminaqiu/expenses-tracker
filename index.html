@@ -9,8 +9,10 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
-        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
+        // UPDATED: Added getDoc
+        import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, deleteDoc, updateDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        // UPDATED: Added deleteObject
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
 
         // ==================================================================================
         // ====> ACTION: PASTE YOUR FIREBASE CONFIGURATION OBJECT FROM THE FIREBASE CONSOLE HERE
@@ -23,7 +25,8 @@ const firebaseConfig = {
     messagingSenderId: "717743221463",
     appId: "1:717743221463:web:d574feaf383b06a380de92",
     measurementId: "G-VN0F315CZF"
-  };        // ==================================================================================
+  };
+          // ==================================================================================
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
@@ -31,7 +34,8 @@ const firebaseConfig = {
 
         window.db = db;
         window.storage = storage;
-        window.fb = { collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, query, orderBy, ref, uploadBytesResumable, getDownloadURL };
+        // UPDATED: Added getDoc and deleteObject to the global helper
+        window.fb = { collection, addDoc, onSnapshot, doc, getDoc, deleteDoc, updateDoc, query, orderBy, ref, uploadBytesResumable, getDownloadURL, deleteObject };
     </script>
 
     <style>
@@ -217,10 +221,38 @@ const firebaseConfig = {
             if (isViewOnlyMode) return false;
             try { await fb.addDoc(fb.collection(db, collectionName), data); return true; } catch (error) { console.error(`Error adding to ${collectionName}:`, error); alert(`Failed to add ${collectionName.slice(0, -1)}.`); return false; }
         }
+
+        // --- UPDATED deleteFromDB FUNCTION ---
         async function deleteFromDB(collectionName, id) {
             if (isViewOnlyMode) return;
-            if (confirm(`Are you sure you want to delete this ${collectionName.slice(0, -1)}?`)) { try { await fb.deleteDoc(fb.doc(db, collectionName, id)); } catch (error) { console.error(`Error deleting from ${collectionName}:`, error); } }
+            if (!confirm(`Are you sure you want to delete this ${collectionName.slice(0, -1)}?`)) return;
+
+            const docRef = fb.doc(db, collectionName, id);
+
+            // NEW LOGIC: If it's an expense, check for and delete the associated receipt
+            if (collectionName === 'expenses') {
+                try {
+                    const docSnap = await fb.getDoc(docRef);
+                    if (docSnap.exists() && docSnap.data().receipt) {
+                        const receiptUrl = docSnap.data().receipt;
+                        const fileRef = fb.ref(storage, receiptUrl);
+                        await fb.deleteObject(fileRef);
+                        console.log("Associated receipt deleted from Storage.");
+                    }
+                } catch (error) {
+                    // Log error but don't block the deletion of the database entry
+                    console.error("Could not delete receipt file. It may have been already deleted or the URL is incorrect.", error);
+                }
+            }
+            
+            // Proceed to delete the document from Firestore
+            try {
+                await fb.deleteDoc(docRef);
+            } catch (error) {
+                console.error(`Error deleting document from ${collectionName}:`, error);
+            }
         }
+
         function listenForCategories() {
             const q = fb.query(fb.collection(db, "categories"), fb.orderBy("name", "asc"));
             fb.onSnapshot(q, (snapshot) => {
@@ -413,6 +445,7 @@ const firebaseConfig = {
             a.click(); URL.revokeObjectURL(url);
         }
         function showEditModal(id, name, icon) {
+            if (isViewOnlyMode) return;
             document.getElementById('edit-category-id').value = id; document.getElementById('edit-category-name').value = name;
             document.getElementById('edit-selected-icon').value = icon;
             populateIconGrid('edit-icon-preset-grid', 'edit-selected-icon', icon);
@@ -426,7 +459,7 @@ const firebaseConfig = {
             document.querySelector('.tab[data-tab-name="add"]').style.display = 'none';
             document.querySelector('.tab[data-tab-name="categories"]').style.display = 'none';
             document.querySelector('.export-btn').style.display = 'none';
-            document.querySelectorAll('.tab')[1].click();
+            document.querySelectorAll('.tab[data-tab-name="view"]')[0].click();
         }
 
         document.addEventListener('DOMContentLoaded', () => {
