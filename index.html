@@ -15,15 +15,16 @@
         // ==================================================================================
         // ====> ACTION: PASTE YOUR FIREBASE CONFIGURATION OBJECT FROM THE FIREBASE CONSOLE HERE
         // ==================================================================================
-const firebaseConfig = {
-    apiKey: "AIzaSyAgEXmz8rUKAUFFukKgKKromV03okUmfFQ",
-    authDomain: "expenses-tracker-8725f.firebaseapp.com",
-    projectId: "expenses-tracker-8725f",
-    storageBucket: "expenses-tracker-8725f.firebasestorage.app",
-    messagingSenderId: "717743221463",
-    appId: "1:717743221463:web:d574feaf383b06a380de92",
-    measurementId: "G-VN0F315CZF"
-  };        // ==================================================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyAgEXmz8rUKAUFFukKgKKromV03okUmfFQ",
+            authDomain: "expenses-tracker-8725f.firebaseapp.com",
+            projectId: "expenses-tracker-8725f",
+            storageBucket: "expenses-tracker-8725f.firebasestorage.app",
+            messagingSenderId: "717743221463",
+            appId: "1:717743221463:web:d574feaf383b06a380de92",
+            measurementId: "G-VN0F315CZF"
+        };
+        // ==================================================================================
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
@@ -104,6 +105,7 @@ const firebaseConfig = {
         .icon-preset { font-size: 24px; padding: 10px; border: 2px solid #e1e8ed; border-radius: 10px; cursor: pointer; transition: all 0.2s ease; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; }
         .icon-preset:hover { transform: scale(1.1); border-color: #a29bfe; }
         .icon-preset.selected { border-color: #667eea; background-color: rgba(102, 126, 234, 0.1); transform: scale(1.1); }
+        #existing-receipt-container { margin-bottom: 10px; }
         
         /* NEW: Class for category breakdown items for better mobile styling */
         .category-breakdown-item { display: flex; justify-content: space-between; align-items: center; }
@@ -241,6 +243,53 @@ const firebaseConfig = {
         </div>
     </div>
 
+    <div id="edit-expense-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Expense</h2>
+                <button class="modal-close-btn" onclick="hideEditExpenseModal()">&times;</button>
+            </div>
+            <form id="edit-expense-form">
+                <input type="hidden" id="edit-expense-id">
+                <div class="form-group">
+                    <label for="edit-date">Date</label>
+                    <input type="date" id="edit-date" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-category">Category</label>
+                    <select id="edit-category" required></select>
+                </div>
+                <div class="form-group">
+                    <label for="edit-amount">Amount (MYR)</label>
+                    <input type="number" id="edit-amount" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit-description">Description</label>
+                    <textarea id="edit-description" rows="3" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Receipt</label>
+                    <div id="existing-receipt-container">
+                        <a id="existing-receipt-link" href="#" target="_blank" rel="noopener noreferrer" class="receipt-link">View Current Receipt</a>
+                        <button type="button" id="remove-receipt-btn" class="delete-btn">Remove Receipt</button>
+                    </div>
+                    <div class="file-upload">
+                        <input type="file" id="edit-receipt" accept="image/*,.pdf">
+                        <label for="edit-receipt" class="file-upload-label" id="edit-file-label">
+                            <span id="edit-file-label-default">📁 Click to upload a new receipt</span>
+                            <span id="edit-file-label-selected" style="display: none;"></span>
+                        </label>
+                    </div>
+                     <div class="progress-bar-container" id="edit-progress-container"><div class="progress-bar" id="edit-progress-bar"></div></div>
+                </div>
+                <div class="modal-buttons">
+                    <button type="submit" class="btn">Save Changes</button>
+                    <button type="button" class="btn" style="background: #6c757d;" onclick="hideEditExpenseModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script>
         const urlParams = new URLSearchParams(window.location.search);
@@ -357,11 +406,19 @@ const firebaseConfig = {
         function displayExpenses(filtered = null) {
             const list = document.getElementById('expenses-list');
             const expensesToShow = filtered || allExpenses;
-            if (expensesToShow.length === 0) { list.innerHTML = `<div class="no-expenses"><div class="no-expenses-icon">📭</div><p>No expenses found. Start tracking!</p></div>`; return; }
+            if (expensesToShow.length === 0) {
+                list.innerHTML = `<div class="no-expenses"><div class="no-expenses-icon">📭</div><p>No expenses found. Start tracking!</p></div>`;
+                return;
+            }
             list.innerHTML = expensesToShow.map(exp => {
                 const category = allCategories.find(c => c.name === exp.category);
                 const icon = category ? category.icon : '📌';
-                const actionButtons = isViewOnlyMode ? '' : `<button class="delete-btn" onclick="deleteFromDB('expenses', '${exp.id}')">Delete</button>`;
+                const actionButtons = isViewOnlyMode ? '' : `
+                    <div class="expense-actions" style="margin-top: 15px; display: flex; gap: 10px;">
+                        <button class="btn" style="padding: 8px 12px; font-size: 14px; background: #ffc107;" onclick="showEditExpenseModal('${exp.id}')">Edit</button>
+                        <button class="delete-btn" style="margin-top: 0;" onclick="deleteFromDB('expenses', '${exp.id}')">Delete</button>
+                    </div>
+                `;
                 return `
                 <div class="expense-item">
                     <div class="expense-header">
@@ -475,6 +532,45 @@ const firebaseConfig = {
         }
         function hideEditModal() { document.getElementById('edit-category-modal').style.display = 'none'; }
         
+        async function showEditExpenseModal(expenseId) {
+            if (isViewOnlyMode) return;
+
+            const expense = allExpenses.find(exp => exp.id === expenseId);
+            if (!expense) {
+                alert("Expense not found!");
+                return;
+            }
+
+            document.getElementById('edit-expense-id').value = expense.id;
+            document.getElementById('edit-date').value = expense.date;
+            document.getElementById('edit-amount').value = expense.amount;
+            document.getElementById('edit-description').value = expense.description;
+
+            const categorySelect = document.getElementById('edit-category');
+            categorySelect.innerHTML = allCategories.map(c => `<option value="${c.name}" ${expense.category === c.name ? 'selected' : ''}>${c.icon} ${c.name}</option>`).join('');
+
+            const existingReceiptContainer = document.getElementById('existing-receipt-container');
+            const existingReceiptLink = document.getElementById('existing-receipt-link');
+            if (expense.receipt) {
+                existingReceiptLink.href = expense.receipt;
+                existingReceiptContainer.style.display = 'block';
+            } else {
+                existingReceiptContainer.style.display = 'none';
+            }
+            
+            document.getElementById('edit-receipt').value = '';
+            document.getElementById('edit-file-label-default').style.display = 'inline';
+            document.getElementById('edit-file-label-selected').style.display = 'none';
+
+
+            document.getElementById('edit-expense-modal').style.display = 'flex';
+            flatpickr("#edit-date", { dateFormat: "Y-m-d" });
+        }
+
+        function hideEditExpenseModal() {
+            document.getElementById('edit-expense-modal').style.display = 'none';
+        }
+
         function setupViewOnlyUI() {
             if (!isViewOnlyMode) return;
             document.getElementById('header-subtitle').textContent = "View-Only Access";
@@ -483,6 +579,124 @@ const firebaseConfig = {
             document.querySelector('.export-btn').style.display = 'none';
             document.querySelectorAll('.tab[data-tab-name="view"]')[0].click();
         }
+
+        document.getElementById('edit-expense-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            if (isViewOnlyMode) return;
+
+            const submitBtn = this.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
+
+            const expenseId = document.getElementById('edit-expense-id').value;
+            const originalExpense = allExpenses.find(exp => exp.id === expenseId);
+            let newReceiptURL = originalExpense.receipt;
+
+            const fileInput = document.getElementById('edit-receipt');
+            if (fileInput.files[0]) {
+                // Delete old receipt if it exists
+                if (originalExpense.receipt) {
+                    try {
+                        const oldFileRef = fb.ref(storage, originalExpense.receipt);
+                        await fb.deleteObject(oldFileRef);
+                    } catch (error) {
+                        console.error("Could not delete the old receipt file.", error);
+                    }
+                }
+                
+                // Upload new receipt
+                const file = fileInput.files[0];
+                const storageRef = fb.ref(storage, `receipts/${Date.now()}_${file.name}`);
+                const uploadTask = fb.uploadBytesResumable(storageRef, file);
+                const progressContainer = document.getElementById('edit-progress-container');
+                const progressBar = document.getElementById('edit-progress-bar');
+                progressContainer.style.display = 'block';
+
+                await new Promise((resolve, reject) => {
+                    uploadTask.on('state_changed',
+                        (snapshot) => {
+                            progressBar.style.width = `${(snapshot.bytesTransferred / snapshot.totalBytes) * 100}%`;
+                        },
+                        (error) => {
+                            console.error("Upload failed:", error);
+                            reject(error);
+                        },
+                        async () => {
+                            newReceiptURL = await fb.getDownloadURL(uploadTask.snapshot.ref);
+                            resolve();
+                        }
+                    );
+                });
+            }
+
+            const updatedData = {
+                date: document.getElementById('edit-date').value,
+                category: document.getElementById('edit-category').value,
+                amount: parseFloat(document.getElementById('edit-amount').value),
+                description: document.getElementById('edit-description').value,
+                receipt: newReceiptURL,
+            };
+
+            try {
+                const docRef = fb.doc(db, "expenses", expenseId);
+                await fb.updateDoc(docRef, updatedData);
+                alert("Expense updated successfully!");
+                hideEditExpenseModal();
+            } catch (error) {
+                console.error("Error updating expense:", error);
+                alert("Failed to update expense.");
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save Changes';
+                const progressContainer = document.getElementById('edit-progress-container');
+                if(progressContainer) {
+                   progressContainer.style.display = 'none';
+                   document.getElementById('edit-progress-bar').style.width = '0%';
+                }
+            }
+        });
+
+        document.getElementById('edit-receipt').addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                document.getElementById('edit-file-label-default').style.display = 'none';
+                const selectedLabel = document.getElementById('edit-file-label-selected');
+                selectedLabel.textContent = file.name.length > 30 ? `${file.name.substring(0, 27)}...` : file.name;
+                selectedLabel.style.display = 'inline';
+            } else {
+                document.getElementById('edit-file-label-default').style.display = 'inline';
+                document.getElementById('edit-file-label-selected').style.display = 'none';
+            }
+        });
+
+        document.getElementById('remove-receipt-btn').addEventListener('click', async function() {
+            if (isViewOnlyMode) return;
+            
+            const expenseId = document.getElementById('edit-expense-id').value;
+            if (!expenseId) return;
+
+            if (confirm("Are you sure you want to remove the receipt for this expense? This cannot be undone.")) {
+                const originalExpense = allExpenses.find(exp => exp.id === expenseId);
+                if (originalExpense && originalExpense.receipt) {
+                    try {
+                        // Delete from storage
+                        const fileRef = fb.ref(storage, originalExpense.receipt);
+                        await fb.deleteObject(fileRef);
+
+                        // Update firestore document
+                        const docRef = fb.doc(db, "expenses", expenseId);
+                        await fb.updateDoc(docRef, { receipt: null });
+                        
+                        alert("Receipt removed.");
+                        document.getElementById('existing-receipt-container').style.display = 'none';
+
+                    } catch (error) {
+                        console.error("Error removing receipt:", error);
+                        alert("Failed to remove receipt.");
+                    }
+                }
+            }
+        });
 
         document.addEventListener('DOMContentLoaded', () => {
             flatpickr("#date", { dateFormat: "Y-m-d", defaultDate: "today" });
