@@ -107,7 +107,6 @@
         .icon-preset.selected { border-color: #667eea; background-color: rgba(102, 126, 234, 0.1); transform: scale(1.1); }
         #existing-receipt-container { margin-bottom: 10px; }
         
-        /* NEW: Class for category breakdown items for better mobile styling */
         .category-breakdown-item { display: flex; justify-content: space-between; align-items: center; }
         .category-actions { display: flex; gap: 10px; align-items: center; }
         
@@ -119,21 +118,19 @@
             .expense-header { flex-direction: column; gap: 10px; align-items: flex-start; }
             .tabs { 
                 overflow-x: auto; 
-                -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+                -webkit-overflow-scrolling: touch;
             }
             .tabs::-webkit-scrollbar { height: 4px; }
             .tabs::-webkit-scrollbar-thumb { background: #dcdde1; border-radius: 2px; }
             .tab { flex-shrink: 0; min-width: 120px; }
             
-            /* NEW: Stack category breakdown items on mobile */
             .category-breakdown-item {
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 15px;
             }
-            .category-breakdown-item > div:first-child { width: 100%; } /* Make category/progress bar full width */
+            .category-breakdown-item > div:first-child { width: 100%; }
 
-            /* NEW: Stack buttons in "Your Categories" list on mobile */
             .custom-category-item {
                 flex-direction: column;
                 align-items: flex-start;
@@ -141,8 +138,8 @@
             .category-actions {
                 width: 100%;
                 margin-top: 15px;
-                flex-direction: column-reverse; /* Put delete below edit for easier reach */
-                align-items: stretch; /* Make buttons full width */
+                flex-direction: column-reverse;
+                align-items: stretch;
                 gap: 10px;
             }
             .category-actions .btn, .category-actions .delete-btn {
@@ -199,7 +196,7 @@
                     <div class="summary-cards">
                         <div class="summary-card"><h3>Total Expenses</h3><div class="amount" id="total-amount">RM 0.00</div></div>
                         <div class="summary-card"><h3>This Month</h3><div class="amount" id="month-amount">RM 0.00</div></div>
-                        <div class="summary-card"><h3>Average Daily</h3><div class="amount" id="daily-average">RM 0.00</div></div>
+                        <div class="summary-card"><h3>Previous Month</h3><div class="amount" id="previous-month-amount">RM 0.00</div></div>
                     </div>
                     <div class="expenses-list" id="category-breakdown">
                         <h3 style="margin-bottom: 20px; color: #2c3e50;">Category Breakdown</h3>
@@ -297,7 +294,7 @@
 
         let allExpenses = [];
         let allCategories = [];
-        const presetIcons = [ '🏡', '💡', '💧', '🌐', '🛋️', '📺', '🚗', '⛽', '🛣️', '🅿️', '🔧', '📱', '🎬', '🎵', '🧸', '🍼', '🛒', '🧽', '💳', '📦', '🍴', '🛵', '🎮', '🎥', '⚽', '🎸', '🏥', '💊', '🏋️', '💰', '📈', '📶' ];
+        const presetIcons = [ '🏡', '💡', '💧', '🌐', '🛋️', '📺', '🚗', '⛽', '🛣️', '🅿️', '🔧', '📱', '🎬', '🎵', '🧸', '🍼', '🛒', '🧽', '💳', '📦', '🍴', '🛵', '🎮', '🎥', '⚽', '🎸', '🏥', '💊', '🏋️', '💰', '📈', '📶', '👨‍👩‍👦' ];
 
         async function addToDB(collectionName, data) {
             if (isViewOnlyMode) return false;
@@ -455,12 +452,28 @@
         function updateSummary() {
             const totalAmount = allExpenses.reduce((sum, exp) => sum + exp.amount, 0);
             document.getElementById('total-amount').textContent = `RM ${totalAmount.toFixed(2)}`;
+            
             const now = new Date();
-            const monthExpenses = allExpenses.filter(exp => { const d = new Date(exp.date); return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); });
+            const monthExpenses = allExpenses.filter(exp => {
+                const d = new Date(exp.date);
+                return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+            });
             const monthTotal = monthExpenses.reduce((sum, exp) => sum + exp.amount, 0);
             document.getElementById('month-amount').textContent = `RM ${monthTotal.toFixed(2)}`;
-            const dailyAverage = monthTotal / now.getDate();
-            document.getElementById('daily-average').textContent = `RM ${isFinite(dailyAverage) ? dailyAverage.toFixed(2) : '0.00'}`;
+
+            let prevMonth = now.getMonth() - 1;
+            let prevMonthYear = now.getFullYear();
+            if (prevMonth < 0) {
+                prevMonth = 11; // December
+                prevMonthYear--;
+            }
+            const previousMonthExpenses = allExpenses.filter(exp => {
+                const d = new Date(exp.date);
+                return d.getMonth() === prevMonth && d.getFullYear() === prevMonthYear;
+            });
+            const previousMonthTotal = previousMonthExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+            document.getElementById('previous-month-amount').textContent = `RM ${previousMonthTotal.toFixed(2)}`;
+            
             const categoryTotals = allExpenses.reduce((acc, exp) => { acc[exp.category] = (acc[exp.category] || 0) + exp.amount; return acc; }, {});
             const list = document.getElementById('category-list');
             if (Object.keys(categoryTotals).length === 0) { list.innerHTML = '<p style="color: #8898aa;">No expenses to analyze</p>'; } else {
@@ -594,7 +607,6 @@
 
             const fileInput = document.getElementById('edit-receipt');
             if (fileInput.files[0]) {
-                // Delete old receipt if it exists
                 if (originalExpense.receipt) {
                     try {
                         const oldFileRef = fb.ref(storage, originalExpense.receipt);
@@ -604,7 +616,6 @@
                     }
                 }
                 
-                // Upload new receipt
                 const file = fileInput.files[0];
                 const storageRef = fb.ref(storage, `receipts/${Date.now()}_${file.name}`);
                 const uploadTask = fb.uploadBytesResumable(storageRef, file);
@@ -679,11 +690,9 @@
                 const originalExpense = allExpenses.find(exp => exp.id === expenseId);
                 if (originalExpense && originalExpense.receipt) {
                     try {
-                        // Delete from storage
                         const fileRef = fb.ref(storage, originalExpense.receipt);
                         await fb.deleteObject(fileRef);
 
-                        // Update firestore document
                         const docRef = fb.doc(db, "expenses", expenseId);
                         await fb.updateDoc(docRef, { receipt: null });
                         
