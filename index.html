@@ -10,7 +10,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, deleteDoc, updateDoc, query, orderBy, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, deleteDoc, updateDoc, query, orderBy, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
 
         // ==================================================================================
@@ -374,7 +374,7 @@
         let allCategories = [];
         let allSalaries = {};
         let allBudgets = {};
-        let isFirstLoad = true;
+        let isInitialExpenseLoad = true;
         let categoryBreakdownView = 'month'; // 'month' or 'allTime'
         const presetIcons = [ '🏡', '💡', '💧', '🌐', '🛋️', '📺', '🚗', '⛽', '🛣️', '🅿️', '🔧', '📱', '🎬', '🎵', '🧸', '🍼', '🛒', '🧽', '💳', '📦', '🍴', '🛵', '🎮', '🎥', '⚽', '🎸', '🏥', '💊', '🏋️', '💰', '📈', '📶', '👨‍👩‍👦' ];
 
@@ -436,9 +436,25 @@
                 populateCategoryDropdown(); populateCategoryFilter(); displayCategories(); displayBudgets(); updateDisplay();
             });
         }
-        function listenForExpenses() {
+       function listenForExpenses() {
             const q = fb.query(fb.collection(db, "expenses"), fb.orderBy("date", "desc"));
-            fb.onSnapshot(q, (snapshot) => { allExpenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); updateDisplay(); });
+            fb.onSnapshot(q, (snapshot) => {
+                allExpenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                if (isInitialExpenseLoad && allExpenses.length > 0) {
+                    populateMonthFilter();
+                    const select = document.getElementById('filter-month');
+                    const now = new Date();
+                    const currentMonthValue = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+                    
+                    if (select.querySelector(`option[value="${currentMonthValue}"]`)) {
+                        select.value = currentMonthValue;
+                    }
+                    isInitialExpenseLoad = false;
+                }
+                
+                updateDisplay();
+            });
         }
 
         document.getElementById('expense-form').addEventListener('submit', async function(e) {
@@ -773,23 +789,13 @@
         }
         function populateMonthFilter() {
             const select = document.getElementById('filter-month');
-            const months = [...new Set(allExpenses.map(exp => exp.date.substring(0, 7)))].sort().reverse();
             const currentVal = select.value;
+            const months = [...new Set(allExpenses.map(exp => exp.date.substring(0, 7)))].sort().reverse();
             select.innerHTML = '<option value="">All Months</option>' + months.map(m => {
                 const [y, n] = m.split('-'); const d = new Date(y, n - 1);
                 return `<option value="${m}">${d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</option>`;
             }).join('');
-            
-            if (isFirstLoad && months.length > 0) {
-                const now = new Date();
-                const year = now.getFullYear();
-                const month = (now.getMonth() + 1).toString().padStart(2, '0');
-                const currentMonthValue = `${year}-${month}`;
-                if (months.includes(currentMonthValue)) {
-                    select.value = currentMonthValue;
-                }
-                isFirstLoad = false;
-            } else {
+            if (select.querySelector(`option[value="${currentVal}"]`)) {
                 select.value = currentVal;
             }
         }
