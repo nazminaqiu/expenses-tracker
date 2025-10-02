@@ -141,6 +141,9 @@
         .btn-small { padding: 10px 15px; font-size: 14px; }
         #receipt-preview-container { margin-top: 15px; text-align: center; }
         #receipt-preview-container img { max-width: 100%; max-height: 200px; border-radius: 10px; border: 2px solid #e1e8ed; }
+        #paste-image-box, #edit-paste-image-box { border: 2px dashed #667eea; border-radius: 10px; min-height: 80px; padding: 10px; color: #667eea; text-align: center; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center;}
+        #paste-image-box:focus, #edit-paste-image-box:focus { outline: none; border-color: #764ba2; background: rgba(102, 126, 234, 0.05); }
+
 
         @media (max-width: 768px) {
             .container { padding: 0 10px; }
@@ -190,6 +193,12 @@
                         </div>
                         <div class="form-group"><label for="amount">Amount (MYR)</label><input type="number" id="amount" step="0.01" placeholder="0.00" required></div>
                         <div class="form-group"><label for="description">Description</label><textarea id="description" rows="3" placeholder="Enter expense details..."></textarea></div>
+                        <div class="form-group">
+                            <label for="paste-image-box">Paste Image Here (Optional)</label>
+                            <div id="paste-image-box" contenteditable="true">Click or paste here</div>
+                            <input type="hidden" id="hidden-pasted-image-url">
+                            <div id="pasted-image-preview-container" style="display:none; margin-top: 10px; text-align: center;"></div>
+                        </div>
                         <div class="form-group">
                             <label for="receipt">Upload Receipt/Proof</label>
                             <input type="hidden" id="hidden-receipt-url">
@@ -336,6 +345,7 @@
             </div>
             <form id="edit-expense-form">
                 <input type="hidden" id="edit-expense-id">
+                <input type="hidden" id="hidden-edit-pasted-image-url">
                 <div class="form-group">
                     <label for="edit-date">Date</label>
                     <input type="date" id="edit-date" required>
@@ -351,6 +361,11 @@
                 <div class="form-group">
                     <label for="edit-description">Description</label>
                     <textarea id="edit-description" rows="3" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="edit-paste-image-box">Paste Image Here (Optional)</label>
+                    <div id="edit-paste-image-box" contenteditable="true">Click or paste here</div>
+                    <div id="edit-pasted-image-preview-container" style="display:none; margin-top: 10px; text-align: center;"></div>
                 </div>
                 <div class="form-group">
                     <label>Receipt</label>
@@ -417,24 +432,11 @@
                         // Delete main receipt
                         if (expenseData.receipt) {
                             await fb.deleteObject(fb.ref(storage, expenseData.receipt));
-                            console.log("Main receipt deleted from Storage.");
                         }
-
-                        // Delete images pasted in description
-                        if (expenseData.description) {
-                            const imageUrls = [...expenseData.description.matchAll(/!\[.*?\]\((.*?)\)/g)].map(match => match[1]);
-                            if (imageUrls.length > 0) {
-                                const deletePromises = imageUrls.map(url => {
-                                    try {
-                                        return fb.deleteObject(fb.ref(storage, url));
-                                    } catch (e) {
-                                        console.error("Skipping deletion of invalid image URL:", url);
-                                        return Promise.resolve();
-                                    }
-                                });
-                                await Promise.all(deletePromises);
-                                console.log("Pasted images deleted from Storage.");
-                            }
+                        
+                        // Delete pasted image
+                        if (expenseData.pastedImage) {
+                           await fb.deleteObject(fb.ref(storage, expenseData.pastedImage));
                         }
                     }
                 } catch (error) {
@@ -506,6 +508,7 @@
             submitBtn.disabled = true; submitBtn.textContent = 'Saving...';
             
             const receiptURL = document.getElementById('hidden-receipt-url').value || null;
+            const pastedImageURL = document.getElementById('hidden-pasted-image-url').value || null;
             
             const expense = { 
                 date: document.getElementById('date').value, 
@@ -513,6 +516,7 @@
                 amount: parseFloat(document.getElementById('amount').value), 
                 description: document.getElementById('description').value, 
                 receipt: receiptURL, 
+                pastedImage: pastedImageURL,
                 timestamp: new Date().toISOString() 
             };
 
@@ -520,7 +524,8 @@
             
             if (success) { 
                 this.reset(); 
-                clearFileInput(false); // Don't delete file from storage
+                clearFileInput(false);
+                clearPastedImage(false, 'add');
                 flatpickr("#date").setDate("today"); 
                 alert('Expense added!'); 
                 document.querySelectorAll('.tab[data-tab-name="view"]')[0].click(); 
@@ -567,7 +572,6 @@
                 try {
                     const fileRef = fb.ref(storage, fileUrl);
                     await fb.deleteObject(fileRef);
-                    console.log("File deleted from Storage.");
                 } catch (error) {
                     console.error("Error deleting file from Storage:", error);
                     alert("Could not delete the file. Please try again.");
@@ -580,6 +584,32 @@
             const previewContainer = document.getElementById('receipt-preview-container');
             previewContainer.innerHTML = '';
             previewContainer.style.display = 'none';
+        }
+        
+        async function clearPastedImage(deleteFromStorage = true, formType = 'add') {
+            const hiddenInputId = (formType === 'add') ? 'hidden-pasted-image-url' : 'hidden-edit-pasted-image-url';
+            const previewContainerId = (formType === 'add') ? 'pasted-image-preview-container' : 'edit-pasted-image-preview-container';
+            const pasteBoxId = (formType === 'add') ? 'paste-image-box' : 'edit-paste-image-box';
+
+            const hiddenUrlInput = document.getElementById(hiddenInputId);
+            const fileUrl = hiddenUrlInput.value;
+            
+            if (deleteFromStorage && fileUrl) {
+                if (!confirm("Are you sure you want to remove this pasted image?")) return;
+                try {
+                    await fb.deleteObject(fb.ref(storage, fileUrl));
+                } catch (error) {
+                    console.error("Error deleting pasted image from Storage:", error);
+                    alert("Could not delete the pasted image. Please try again.");
+                    return; // Stop if deletion fails
+                }
+            }
+            
+            hiddenUrlInput.value = '';
+            const previewContainer = document.getElementById(previewContainerId);
+            previewContainer.innerHTML = '';
+            previewContainer.style.display = 'none';
+            document.getElementById(pasteBoxId).style.display = 'flex';
         }
 
 
@@ -606,9 +636,9 @@
                 const icon = category ? category.icon : '📌';
                 
                 let descriptionHTML = exp.description || '';
-                descriptionHTML = descriptionHTML.replace(/!\[(.*?)\]\((.*?)\)/g, 
-                    `<img src="$2" alt="$1" style="max-width: 100px; cursor: pointer; border-radius: 5px; margin-top: 5px;" onclick="showImageModal('$2')">`
-                );
+                if(exp.pastedImage) {
+                    descriptionHTML += `<br><img src="${exp.pastedImage}" alt="Pasted content" onclick="showImageModal('${exp.pastedImage}')" />`;
+                }
                 
                 const actionButtons = isViewOnlyMode ? '' : `
                     <div class="expense-actions" style="margin-top: 15px; display: flex; gap: 10px;">
@@ -912,6 +942,19 @@
             document.getElementById('edit-date').value = expense.date;
             document.getElementById('edit-amount').value = expense.amount;
             document.getElementById('edit-description').value = expense.description;
+            document.getElementById('hidden-edit-pasted-image-url').value = expense.pastedImage || '';
+
+            if (expense.pastedImage) {
+                const previewContainer = document.getElementById('edit-pasted-image-preview-container');
+                previewContainer.innerHTML = `<img src="${expense.pastedImage}" alt="Pasted preview" style="max-width: 100%; max-height: 150px; border-radius: 5px;">
+                                              <button type="button" onclick="clearPastedImage(true, 'edit')" class="remove-file-btn" style="display:inline-block; margin-left: 10px;">&times;</button>`;
+                previewContainer.style.display = 'block';
+                document.getElementById('edit-paste-image-box').style.display = 'none';
+            } else {
+                clearPastedImage(false, 'edit');
+            }
+
+
             const categorySelect = document.getElementById('edit-category');
             categorySelect.innerHTML = allCategories.map(c => `<option value="${c.name}" ${expense.category === c.name ? 'selected' : ''}>${c.icon} ${c.name}</option>`).join('');
             const existingReceiptContainer = document.getElementById('existing-receipt-container');
@@ -927,7 +970,10 @@
             flatpickr("#edit-date", { dateFormat: "Y-m-d" });
         }
 
-        function hideEditExpenseModal() { document.getElementById('edit-expense-modal').style.display = 'none'; }
+        function hideEditExpenseModal() { 
+            document.getElementById('edit-expense-modal').style.display = 'none';
+            clearPastedImage(false, 'edit');
+        }
 
         function setupViewOnlyUI() {
             if (!isViewOnlyMode) return;
@@ -963,7 +1009,14 @@
                     uploadTask.on('state_changed', (snapshot) => { progressBar.style.width = `${(snapshot.bytesTransferred / snapshot.totalBytes) * 100}%`; }, (error) => { console.error("Upload failed:", error); reject(error); }, async () => { newReceiptURL = await fb.getDownloadURL(uploadTask.snapshot.ref); resolve(); });
                 });
             }
-            const updatedData = { date: document.getElementById('edit-date').value, category: document.getElementById('edit-category').value, amount: parseFloat(document.getElementById('edit-amount').value), description: document.getElementById('edit-description').value, receipt: newReceiptURL, };
+            const updatedData = { 
+                date: document.getElementById('edit-date').value, 
+                category: document.getElementById('edit-category').value, 
+                amount: parseFloat(document.getElementById('edit-amount').value), 
+                description: document.getElementById('edit-description').value, 
+                receipt: newReceiptURL,
+                pastedImage: document.getElementById('hidden-edit-pasted-image-url').value || null
+            };
             try {
                 await fb.updateDoc(fb.doc(db, "expenses", expenseId), updatedData);
                 alert("Expense updated successfully!"); hideEditExpenseModal();
@@ -1003,7 +1056,7 @@
             }
         });
         
-        async function handlePaste(event) {
+        async function handlePaste(event, formType = 'add') {
             const items = (event.clipboardData || window.clipboardData).items;
             let imageFile = null;
             for (const item of items) {
@@ -1014,10 +1067,18 @@
             }
             if (!imageFile) return;
             event.preventDefault();
-            const targetTextarea = event.target;
-            const originalPlaceholder = targetTextarea.placeholder;
-            targetTextarea.disabled = true;
-            targetTextarea.placeholder = "Uploading image...";
+            
+            const pasteBoxId = (formType === 'add') ? 'paste-image-box' : 'edit-paste-image-box';
+            const hiddenInputId = (formType === 'add') ? 'hidden-pasted-image-url' : 'hidden-edit-pasted-image-url';
+            const previewContainerId = (formType === 'add') ? 'pasted-image-preview-container' : 'edit-pasted-image-preview-container';
+
+            const pasteBox = document.getElementById(pasteBoxId);
+            const hiddenInput = document.getElementById(hiddenInputId);
+            const previewContainer = document.getElementById(previewContainerId);
+
+            pasteBox.textContent = 'Uploading...';
+            pasteBox.style.pointerEvents = 'none';
+            
             try {
                 const storageRef = fb.ref(storage, `pasted_images/${Date.now()}_${imageFile.name}`);
                 const uploadTask = fb.uploadBytesResumable(storageRef, imageFile);
@@ -1030,15 +1091,21 @@
                         }
                     );
                 });
-                const markdownLink = `![Pasted Image](${downloadURL})`;
-                targetTextarea.value += (targetTextarea.value ? '\n' : '') + markdownLink;
+                
+                hiddenInput.value = downloadURL;
+                previewContainer.innerHTML = `<img src="${downloadURL}" alt="Pasted preview" style="max-width: 100%; max-height: 150px; border-radius: 5px;">
+                                              <button type="button" onclick="clearPastedImage(true, '${formType}')" class="remove-file-btn" style="display:inline-block; margin-left: 10px;">&times;</button>`;
+                previewContainer.style.display = 'block';
+                pasteBox.style.display = 'none';
+                
             } catch (error) {
                 alert("Failed to upload pasted image. Please try again.");
+                pasteBox.textContent = 'Click or paste here';
             } finally {
-                targetTextarea.disabled = false;
-                targetTextarea.placeholder = originalPlaceholder;
+                pasteBox.style.pointerEvents = 'auto';
             }
         }
+
 
         document.addEventListener('DOMContentLoaded', () => {
             flatpickr("#date", { dateFormat: "Y-m-d", defaultDate: "today" });
@@ -1109,8 +1176,8 @@
             });
             
             document.getElementById('category').addEventListener('change', updateAddExpenseBudgetInfo);
-            document.getElementById('description').addEventListener('paste', handlePaste);
-            document.getElementById('edit-description').addEventListener('paste', handlePaste);
+            document.getElementById('paste-image-box').addEventListener('paste', (e) => handlePaste(e, 'add'));
+            document.getElementById('edit-paste-image-box').addEventListener('paste', (e) => handlePaste(e, 'edit'));
 
 
             populateIconGrid('icon-preset-grid', 'selected-icon');
