@@ -85,6 +85,8 @@
         .expense-amount { font-size: 24px; font-weight: 700; color: #2c3e50; }
         .expense-details { color: #657786; font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; }
         .expense-details img { max-width: 100%; border-radius: 10px; margin-top: 10px; border: 2px solid #e1e8ed; }
+        .expense-details summary { cursor: pointer; font-weight: 600; color: #667eea; transition: color 0.3s ease; display: inline-block; }
+        .expense-details summary:hover { color: #764ba2; }
         .expense-date { color: #8898aa; font-size: 13px; margin-top: 10px; }
         .receipt-link { color: #667eea; text-decoration: none; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; margin-top: 10px; transition: color 0.3s ease; }
         .receipt-link:hover { color: #764ba2; }
@@ -395,16 +397,48 @@
         async function deleteFromDB(collectionName, id) {
             if (isViewOnlyMode) return;
             if (!confirm(`Are you sure you want to delete this ${collectionName.slice(0, -1)}?`)) return;
+
             const docRef = fb.doc(db, collectionName, id);
+
             if (collectionName === 'expenses') {
                 try {
                     const docSnap = await fb.getDoc(docRef);
-                    if (docSnap.exists() && docSnap.data().receipt) {
-                        await fb.deleteObject(fb.ref(storage, docSnap.data().receipt));
+                    if (docSnap.exists()) {
+                        const expenseData = docSnap.data();
+
+                        // Delete main receipt
+                        if (expenseData.receipt) {
+                            await fb.deleteObject(fb.ref(storage, expenseData.receipt));
+                            console.log("Main receipt deleted from Storage.");
+                        }
+
+                        // Delete images pasted in description
+                        if (expenseData.description) {
+                            const imageUrls = [...expenseData.description.matchAll(/!\[.*?\]\((.*?)\)/g)].map(match => match[1]);
+                            if (imageUrls.length > 0) {
+                                const deletePromises = imageUrls.map(url => {
+                                    try {
+                                        return fb.deleteObject(fb.ref(storage, url));
+                                    } catch (e) {
+                                        console.error("Skipping deletion of invalid image URL:", url);
+                                        return Promise.resolve();
+                                    }
+                                });
+                                await Promise.all(deletePromises);
+                                console.log("Pasted images deleted from Storage.");
+                            }
+                        }
                     }
-                } catch (error) { console.error("Could not delete receipt file.", error); }
+                } catch (error) {
+                    console.error("Error deleting associated files from Storage:", error);
+                }
             }
-            try { await fb.deleteDoc(docRef); } catch (error) { console.error(`Error deleting document from ${collectionName}:`, error); }
+
+            try {
+                await fb.deleteDoc(docRef);
+            } catch (error) {
+                console.error(`Error deleting document from ${collectionName}:`, error);
+            }
         }
         
         function listenForBudgets() {
@@ -564,7 +598,12 @@
                 const icon = category ? category.icon : '📌';
                 
                 let descriptionHTML = exp.description || '';
-                descriptionHTML = descriptionHTML.replace(/!\[.*?\]\((.*?)\)/g, `<img src="$1" alt="Pasted Image" />`);
+                descriptionHTML = descriptionHTML.replace(/!\[(.*?)\]\((.*?)\)/g, 
+                    `<details style="margin-top:10px;">
+                        <summary>🖼️ View Pasted Image</summary>
+                        <img src="$2" alt="$1" style="margin-top:10px;" />
+                    </details>`
+                );
                 
                 const actionButtons = isViewOnlyMode ? '' : `
                     <div class="expense-actions" style="margin-top: 15px; display: flex; gap: 10px;">
