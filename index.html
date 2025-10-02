@@ -84,9 +84,8 @@
         .expense-category { display: inline-block; padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; text-transform: capitalize; letter-spacing: 0.5px; background: #dfe6e9; color: #2d3436; }
         .expense-amount { font-size: 24px; font-weight: 700; color: #2c3e50; }
         .expense-details { color: #657786; font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; }
-        .expense-details img { max-width: 100%; border-radius: 10px; margin-top: 10px; border: 2px solid #e1e8ed; }
-        .expense-details summary { cursor: pointer; font-weight: 600; color: #667eea; transition: color 0.3s ease; display: inline-block; }
-        .expense-details summary:hover { color: #764ba2; }
+        .expense-details img { max-width: 100px; border-radius: 5px; margin: 10px 10px 0 0; border: 2px solid #e1e8ed; cursor: pointer; transition: transform 0.2s; }
+        .expense-details img:hover { transform: scale(1.05); }
         .expense-date { color: #8898aa; font-size: 13px; margin-top: 10px; }
         .receipt-link { color: #667eea; text-decoration: none; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; margin-top: 10px; transition: color 0.3s ease; }
         .receipt-link:hover { color: #764ba2; }
@@ -114,6 +113,7 @@
         .modal-content { background: white; padding: 30px; border-radius: 20px; width: 90%; max-width: 500px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); animation: fadeIn 0.3s ease; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; color: #2c3e50; }
         .modal-close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: #8898aa; }
+        #image-modal .modal-close-btn { position: absolute; top: 15px; right: 15px; font-size: 30px; color: white; background: rgba(0,0,0,0.5); border-radius: 50%; width: 40px; height: 40px; line-height: 40px; text-align: center; }
         .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
         .progress-bar-container { width: 100%; height: 10px; background-color: #e1e8ed; border-radius: 5px; overflow: hidden; margin-top: 10px; display: none; }
         .progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); transition: width 0.3s ease; }
@@ -300,6 +300,14 @@
             </div>
         </div>
     </div>
+    
+    <div id="image-modal" class="modal-overlay" onclick="hideImageModal()">
+        <div class="modal-content" style="padding: 10px; max-width: 90vw; max-height: 90vh; background: none; box-shadow: none;" onclick="event.stopPropagation()">
+            <button class="modal-close-btn" onclick="hideImageModal()">&times;</button>
+            <img id="image-modal-img" src="" alt="Full-size Image" style="max-width: 100%; max-height: calc(90vh - 20px); display: block; margin: auto;">
+        </div>
+    </div>
+
 
     <div id="edit-category-modal" class="modal-overlay">
         <div class="modal-content">
@@ -599,10 +607,7 @@
                 
                 let descriptionHTML = exp.description || '';
                 descriptionHTML = descriptionHTML.replace(/!\[(.*?)\]\((.*?)\)/g, 
-                    `<details style="margin-top:10px;">
-                        <summary>🖼️ View Pasted Image</summary>
-                        <img src="$2" alt="$1" style="margin-top:10px;" />
-                    </details>`
+                    `<img src="$2" alt="$1" style="max-width: 100px; cursor: pointer; border-radius: 5px; margin-top: 5px;" onclick="showImageModal('$2')">`
                 );
                 
                 const actionButtons = isViewOnlyMode ? '' : `
@@ -888,6 +893,15 @@
             document.getElementById('edit-category-modal').style.display = 'flex';
         }
         function hideEditModal() { document.getElementById('edit-category-modal').style.display = 'none'; }
+        
+        function showImageModal(imageUrl) {
+            document.getElementById('image-modal-img').src = imageUrl;
+            document.getElementById('image-modal').style.display = 'flex';
+        }
+
+        function hideImageModal() {
+            document.getElementById('image-modal').style.display = 'none';
+        }
         
         async function showEditExpenseModal(expenseId) {
             if (isViewOnlyMode) return;
