@@ -6,6 +6,7 @@
     <title>Shared Monthly Expense Tracker</title>
     
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://npmcdn.com/flatpickr/dist/plugins/monthSelect/style.css">
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
@@ -106,9 +107,12 @@
         .icon-preset:hover { transform: scale(1.1); border-color: #a29bfe; }
         .icon-preset.selected { border-color: #667eea; background-color: rgba(102, 126, 234, 0.1); transform: scale(1.1); }
         #existing-receipt-container { margin-bottom: 10px; }
-        
         .category-breakdown-item { display: flex; justify-content: space-between; align-items: center; }
         .category-actions { display: flex; gap: 10px; align-items: center; }
+        .view-toggle { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 15px; flex-wrap: wrap; }
+        .view-btn { padding: 8px 16px; font-size: 14px; background: white; color: #667eea; border: 2px solid #e1e8ed; box-shadow: none; }
+        .view-btn:hover { background: rgba(102, 126, 234, 0.05); transform: translateY(0); box-shadow: none; }
+        .view-btn.active { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-color: transparent; }
         
         @media (max-width: 768px) {
             .container { padding: 0 10px; }
@@ -116,36 +120,15 @@
             .header h1 { font-size: 1.8em; }
             .summary-cards { grid-template-columns: 1fr; }
             .expense-header { flex-direction: column; gap: 10px; align-items: flex-start; }
-            .tabs { 
-                overflow-x: auto; 
-                -webkit-overflow-scrolling: touch;
-            }
+            .tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; }
             .tabs::-webkit-scrollbar { height: 4px; }
             .tabs::-webkit-scrollbar-thumb { background: #dcdde1; border-radius: 2px; }
             .tab { flex-shrink: 0; min-width: 120px; }
-            
-            .category-breakdown-item {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 15px;
-            }
+            .category-breakdown-item { flex-direction: column; align-items: flex-start; gap: 15px; }
             .category-breakdown-item > div:first-child { width: 100%; }
-
-            .custom-category-item {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-            .category-actions {
-                width: 100%;
-                margin-top: 15px;
-                flex-direction: column-reverse;
-                align-items: stretch;
-                gap: 10px;
-            }
-            .category-actions .btn, .category-actions .delete-btn {
-                margin: 0;
-                text-align: center;
-            }
+            .custom-category-item { flex-direction: column; align-items: flex-start; }
+            .category-actions { width: 100%; margin-top: 15px; flex-direction: column-reverse; align-items: stretch; gap: 10px; }
+            .category-actions .btn, .category-actions .delete-btn { margin: 0; text-align: center; }
         }
     </style>
 </head>
@@ -204,7 +187,7 @@
                         <form id="salary-form">
                             <div class="form-group">
                                 <label for="salary-month">Select Month</label>
-                                <input type="month" id="salary-month" required>
+                                <input type="text" id="salary-month" placeholder="Select a month..." required>
                             </div>
                             <div class="form-group">
                                 <label for="salary-amount">Salary Amount (MYR)</label>
@@ -214,7 +197,11 @@
                         </form>
                     </div>
                     <div class="expenses-list" id="category-breakdown">
-                        <h3 style="margin-bottom: 20px; color: #2c3e50;">Category Breakdown (All Time)</h3>
+                        <div class="view-toggle">
+                            <h3 id="category-breakdown-title" style="margin-bottom: 0; color: #2c3e50; flex-grow: 1;">Category Breakdown</h3>
+                            <button id="view-month-btn" class="btn view-btn">This Month</button>
+                            <button id="view-all-btn" class="btn view-btn active">All Time</button>
+                        </div>
                         <div id="category-list"></div>
                     </div>
                 </div>
@@ -303,6 +290,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/plugins/monthSelect/index.js"></script>
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const isViewOnlyMode = urlParams.get('view') === 'true';
@@ -310,6 +298,7 @@
         let allExpenses = [];
         let allCategories = [];
         let allSalaries = {};
+        let categoryBreakdownView = 'allTime'; // 'month' or 'allTime'
         const presetIcons = [ '🏡', '💡', '💧', '🌐', '🛋️', '📺', '🚗', '⛽', '🛣️', '🅿️', '🔧', '📱', '🎬', '🎵', '🧸', '🍼', '🛒', '🧽', '💳', '📦', '🍴', '🛵', '🎮', '🎥', '⚽', '🎸', '🏥', '💊', '🏋️', '💰', '📈', '📶', '👨‍👩‍👦' ];
 
         async function addToDB(collectionName, data) {
@@ -321,7 +310,7 @@
             if (isViewOnlyMode) return false;
             try {
                 const docRef = fb.doc(db, collectionName, docId);
-                await fb.setDoc(docRef, data, { merge: true }); // Using merge to avoid overwriting other fields if any
+                await fb.setDoc(docRef, data, { merge: true });
                 return true;
             } catch (error) {
                 console.error(`Error setting document in ${collectionName}:`, error);
@@ -353,9 +342,7 @@
         function listenForSalaries() {
             fb.onSnapshot(fb.collection(db, "salaries"), (snapshot) => {
                 allSalaries = {};
-                snapshot.docs.forEach(doc => {
-                    allSalaries[doc.id] = doc.data();
-                });
+                snapshot.docs.forEach(doc => { allSalaries[doc.id] = doc.data(); });
                 updateDisplay();
             });
         }
@@ -401,19 +388,12 @@
             e.preventDefault();
             const monthYear = document.getElementById('salary-month').value;
             const amount = parseFloat(document.getElementById('salary-amount').value);
-            if (!monthYear || isNaN(amount)) {
-                return alert("Please select a month and enter a valid salary amount.");
-            }
-
+            if (!monthYear || isNaN(amount)) { return alert("Please select a month and enter a valid salary amount."); }
             const success = await setInDB("salaries", monthYear, { amount });
             if (success) {
                 alert(`Salary for ${monthYear} saved!`);
                 this.reset();
-                 // Set salary month input to the current month
-                const today = new Date();
-                const year = today.getFullYear();
-                const month = (today.getMonth() + 1).toString().padStart(2, '0');
-                document.getElementById('salary-month').value = `${year}-${month}`;
+                flatpickr("#salary-month").setDate(new Date());
             }
         });
 
@@ -442,13 +422,10 @@
                 selectedLabel.textContent = file.name.length > 30 ? `${file.name.substring(0, 27)}...` : file.name;
                 selectedLabel.style.display = 'inline';
                 document.getElementById('remove-file-btn').style.display = 'inline-block';
-            } else {
-                clearFileInput();
-            }
+            } else { clearFileInput(); }
         });
 
         document.getElementById('remove-file-btn').addEventListener('click', clearFileInput);
-
         function clearFileInput() {
             document.getElementById('receipt').value = '';
             document.getElementById('file-label-default').style.display = 'inline';
@@ -472,8 +449,7 @@
                     <div class="expense-actions" style="margin-top: 15px; display: flex; gap: 10px;">
                         <button class="btn" style="padding: 8px 12px; font-size: 14px; background: #ffc107;" onclick="showEditExpenseModal('${exp.id}')">Edit</button>
                         <button class="delete-btn" style="margin-top: 0;" onclick="deleteFromDB('expenses', '${exp.id}')">Delete</button>
-                    </div>
-                `;
+                    </div>`;
                 return `
                 <div class="expense-item">
                     <div class="expense-header">
@@ -498,10 +474,7 @@
                     <button class="delete-btn" style="margin-top: 0;" onclick="deleteFromDB('categories', '${cat.id}')">Delete</button>`;
                 return `
                 <div class="expense-item custom-category-item" style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <span style="font-size: 24px; margin-right: 15px;">${cat.icon}</span>
-                        <span style="font-weight: 600;">${cat.name}</span>
-                    </div>
+                    <div><span style="font-size: 24px; margin-right: 15px;">${cat.icon}</span><span style="font-weight: 600;">${cat.name}</span></div>
                     <div class="category-actions">${actionButtons}</div>
                 </div>`;
             }).join('');
@@ -525,15 +498,23 @@
 
             const currentMonthSalary = allSalaries[currentMonthStr] ? allSalaries[currentMonthStr].amount : 0;
             document.getElementById('month-salary').textContent = `RM ${currentMonthSalary.toFixed(2)}`;
-
             const remainingBalance = currentMonthSalary - monthTotal;
             document.getElementById('remaining-balance').textContent = `RM ${remainingBalance.toFixed(2)}`;
             
-            const categoryTotals = allExpenses.reduce((acc, exp) => { acc[exp.category] = (acc[exp.category] || 0) + exp.amount; return acc; }, {});
+            const breakdownTitle = document.getElementById('category-breakdown-title');
             const list = document.getElementById('category-list');
-            if (Object.keys(categoryTotals).length === 0) { list.innerHTML = '<p style="color: #8898aa;">No expenses to analyze</p>'; } else {
+            const expensesForBreakdown = (categoryBreakdownView === 'month') ? monthExpenses : allExpenses;
+            const totalForBreakdown = (categoryBreakdownView === 'month') ? monthTotal : totalAmount;
+            
+            breakdownTitle.textContent = `Category Breakdown (${categoryBreakdownView === 'month' ? 'This Month' : 'All Time'})`;
+
+            const categoryTotals = expensesForBreakdown.reduce((acc, exp) => { acc[exp.category] = (acc[exp.category] || 0) + exp.amount; return acc; }, {});
+
+            if (Object.keys(categoryTotals).length === 0) {
+                list.innerHTML = '<p style="color: #8898aa;">No expenses to analyze for this period.</p>';
+            } else {
                 list.innerHTML = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]).map(([name, amount]) => {
-                    const pct = totalAmount > 0 ? (amount / totalAmount * 100).toFixed(1) : 0;
+                    const pct = totalForBreakdown > 0 ? (amount / totalForBreakdown * 100).toFixed(1) : 0;
                     const icon = allCategories.find(c => c.name === name)?.icon || '📌';
                     return `<div class="expense-item category-breakdown-item"><div style="display: flex; align-items: center; gap: 15px;"><span class="expense-category">${icon} ${name}</span><div style="width: 200px; height: 8px; background: #e1e8ed; border-radius: 4px; overflow: hidden;"><div style="width: ${pct}%; height: 100%; background: linear-gradient(90deg, #667eea, #764ba2);"></div></div></div><div><span style="font-weight: 700;">RM ${amount.toFixed(2)}</span><span style="color: #8898aa; font-size: 14px;"> (${pct}%)</span></div></div>`;
                 }).join('');
@@ -602,42 +583,30 @@
         
         async function showEditExpenseModal(expenseId) {
             if (isViewOnlyMode) return;
-
             const expense = allExpenses.find(exp => exp.id === expenseId);
-            if (!expense) {
-                alert("Expense not found!");
-                return;
-            }
+            if (!expense) { alert("Expense not found!"); return; }
 
             document.getElementById('edit-expense-id').value = expense.id;
             document.getElementById('edit-date').value = expense.date;
             document.getElementById('edit-amount').value = expense.amount;
             document.getElementById('edit-description').value = expense.description;
-
             const categorySelect = document.getElementById('edit-category');
             categorySelect.innerHTML = allCategories.map(c => `<option value="${c.name}" ${expense.category === c.name ? 'selected' : ''}>${c.icon} ${c.name}</option>`).join('');
-
             const existingReceiptContainer = document.getElementById('existing-receipt-container');
             const existingReceiptLink = document.getElementById('existing-receipt-link');
             if (expense.receipt) {
                 existingReceiptLink.href = expense.receipt;
                 existingReceiptContainer.style.display = 'block';
-            } else {
-                existingReceiptContainer.style.display = 'none';
-            }
+            } else { existingReceiptContainer.style.display = 'none'; }
             
             document.getElementById('edit-receipt').value = '';
             document.getElementById('edit-file-label-default').style.display = 'inline';
             document.getElementById('edit-file-label-selected').style.display = 'none';
-
-
             document.getElementById('edit-expense-modal').style.display = 'flex';
             flatpickr("#edit-date", { dateFormat: "Y-m-d" });
         }
 
-        function hideEditExpenseModal() {
-            document.getElementById('edit-expense-modal').style.display = 'none';
-        }
+        function hideEditExpenseModal() { document.getElementById('edit-expense-modal').style.display = 'none'; }
 
         function setupViewOnlyUI() {
             if (!isViewOnlyMode) return;
@@ -652,74 +621,35 @@
         document.getElementById('edit-expense-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             if (isViewOnlyMode) return;
-
             const submitBtn = this.querySelector('button[type="submit"]');
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Saving...';
-
+            submitBtn.disabled = true; submitBtn.textContent = 'Saving...';
             const expenseId = document.getElementById('edit-expense-id').value;
             const originalExpense = allExpenses.find(exp => exp.id === expenseId);
             let newReceiptURL = originalExpense.receipt;
-
             const fileInput = document.getElementById('edit-receipt');
             if (fileInput.files[0]) {
                 if (originalExpense.receipt) {
-                    try {
-                        const oldFileRef = fb.ref(storage, originalExpense.receipt);
-                        await fb.deleteObject(oldFileRef);
-                    } catch (error) {
-                        console.error("Could not delete the old receipt file.", error);
-                    }
+                    try { await fb.deleteObject(fb.ref(storage, originalExpense.receipt)); } catch (error) { console.error("Could not delete the old receipt file.", error); }
                 }
-                
                 const file = fileInput.files[0];
                 const storageRef = fb.ref(storage, `receipts/${Date.now()}_${file.name}`);
                 const uploadTask = fb.uploadBytesResumable(storageRef, file);
                 const progressContainer = document.getElementById('edit-progress-container');
                 const progressBar = document.getElementById('edit-progress-bar');
                 progressContainer.style.display = 'block';
-
                 await new Promise((resolve, reject) => {
-                    uploadTask.on('state_changed',
-                        (snapshot) => {
-                            progressBar.style.width = `${(snapshot.bytesTransferred / snapshot.totalBytes) * 100}%`;
-                        },
-                        (error) => {
-                            console.error("Upload failed:", error);
-                            reject(error);
-                        },
-                        async () => {
-                            newReceiptURL = await fb.getDownloadURL(uploadTask.snapshot.ref);
-                            resolve();
-                        }
-                    );
+                    uploadTask.on('state_changed', (snapshot) => { progressBar.style.width = `${(snapshot.bytesTransferred / snapshot.totalBytes) * 100}%`; }, (error) => { console.error("Upload failed:", error); reject(error); }, async () => { newReceiptURL = await fb.getDownloadURL(uploadTask.snapshot.ref); resolve(); });
                 });
             }
-
-            const updatedData = {
-                date: document.getElementById('edit-date').value,
-                category: document.getElementById('edit-category').value,
-                amount: parseFloat(document.getElementById('edit-amount').value),
-                description: document.getElementById('edit-description').value,
-                receipt: newReceiptURL,
-            };
-
+            const updatedData = { date: document.getElementById('edit-date').value, category: document.getElementById('edit-category').value, amount: parseFloat(document.getElementById('edit-amount').value), description: document.getElementById('edit-description').value, receipt: newReceiptURL, };
             try {
-                const docRef = fb.doc(db, "expenses", expenseId);
-                await fb.updateDoc(docRef, updatedData);
-                alert("Expense updated successfully!");
-                hideEditExpenseModal();
-            } catch (error) {
-                console.error("Error updating expense:", error);
-                alert("Failed to update expense.");
+                await fb.updateDoc(fb.doc(db, "expenses", expenseId), updatedData);
+                alert("Expense updated successfully!"); hideEditExpenseModal();
+            } catch (error) { console.error("Error updating expense:", error); alert("Failed to update expense.");
             } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Save Changes';
+                submitBtn.disabled = false; submitBtn.textContent = 'Save Changes';
                 const progressContainer = document.getElementById('edit-progress-container');
-                if(progressContainer) {
-                   progressContainer.style.display = 'none';
-                   document.getElementById('edit-progress-bar').style.width = '0%';
-                }
+                if(progressContainer) { progressContainer.style.display = 'none'; document.getElementById('edit-progress-bar').style.width = '0%'; }
             }
         });
 
@@ -738,38 +668,41 @@
 
         document.getElementById('remove-receipt-btn').addEventListener('click', async function() {
             if (isViewOnlyMode) return;
-            
             const expenseId = document.getElementById('edit-expense-id').value;
             if (!expenseId) return;
-
             if (confirm("Are you sure you want to remove the receipt for this expense? This cannot be undone.")) {
                 const originalExpense = allExpenses.find(exp => exp.id === expenseId);
                 if (originalExpense && originalExpense.receipt) {
                     try {
-                        const fileRef = fb.ref(storage, originalExpense.receipt);
-                        await fb.deleteObject(fileRef);
-
-                        const docRef = fb.doc(db, "expenses", expenseId);
-                        await fb.updateDoc(docRef, { receipt: null });
-                        
-                        alert("Receipt removed.");
-                        document.getElementById('existing-receipt-container').style.display = 'none';
-
-                    } catch (error) {
-                        console.error("Error removing receipt:", error);
-                        alert("Failed to remove receipt.");
-                    }
+                        await fb.deleteObject(fb.ref(storage, originalExpense.receipt));
+                        await fb.updateDoc(fb.doc(db, "expenses", expenseId), { receipt: null });
+                        alert("Receipt removed."); document.getElementById('existing-receipt-container').style.display = 'none';
+                    } catch (error) { console.error("Error removing receipt:", error); alert("Failed to remove receipt."); }
                 }
             }
         });
 
         document.addEventListener('DOMContentLoaded', () => {
             flatpickr("#date", { dateFormat: "Y-m-d", defaultDate: "today" });
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = (today.getMonth() + 1).toString().padStart(2, '0');
-            document.getElementById('salary-month').value = `${year}-${month}`;
+            flatpickr("#salary-month", {
+                plugins: [ new monthSelectPlugin({ shorthand: true, dateFormat: "Y-m" }) ],
+                defaultDate: new Date()
+            });
             
+            document.getElementById('view-month-btn').addEventListener('click', () => {
+                categoryBreakdownView = 'month';
+                document.getElementById('view-month-btn').classList.add('active');
+                document.getElementById('view-all-btn').classList.remove('active');
+                updateSummary();
+            });
+
+            document.getElementById('view-all-btn').addEventListener('click', () => {
+                categoryBreakdownView = 'allTime';
+                document.getElementById('view-all-btn').classList.add('active');
+                document.getElementById('view-month-btn').classList.remove('active');
+                updateSummary();
+            });
+
             populateIconGrid('icon-preset-grid', 'selected-icon');
             listenForSalaries();
             listenForCategories();
