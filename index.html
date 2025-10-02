@@ -9,7 +9,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, deleteDoc, updateDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, deleteDoc, updateDoc, query, orderBy, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
 
         // ==================================================================================
@@ -32,7 +32,7 @@
 
         window.db = db;
         window.storage = storage;
-        window.fb = { collection, addDoc, onSnapshot, doc, getDoc, deleteDoc, updateDoc, query, orderBy, ref, uploadBytesResumable, getDownloadURL, deleteObject };
+        window.fb = { collection, addDoc, onSnapshot, doc, getDoc, deleteDoc, updateDoc, query, orderBy, ref, uploadBytesResumable, getDownloadURL, deleteObject, setDoc };
     </script>
 
     <style>
@@ -194,12 +194,27 @@
                 </div>
                 <div id="summary-tab" class="tab-content">
                     <div class="summary-cards">
-                        <div class="summary-card"><h3>Total Expenses</h3><div class="amount" id="total-amount">RM 0.00</div></div>
-                        <div class="summary-card"><h3>This Month</h3><div class="amount" id="month-amount">RM 0.00</div></div>
-                        <div class="summary-card"><h3>Previous Month</h3><div class="amount" id="previous-month-amount">RM 0.00</div></div>
+                        <div class="summary-card"><h3>This Month's Salary</h3><div class="amount" id="month-salary">RM 0.00</div></div>
+                        <div class="summary-card"><h3>This Month's Expenses</h3><div class="amount" id="month-amount">RM 0.00</div></div>
+                        <div class="summary-card"><h3>Remaining Balance</h3><div class="amount" id="remaining-balance">RM 0.00</div></div>
+                        <div class="summary-card"><h3>Total Expenses (All Time)</h3><div class="amount" id="total-amount">RM 0.00</div></div>
+                    </div>
+                    <div id="salary-section" class="expenses-list" style="margin-bottom: 30px;">
+                        <h3 style="margin-bottom: 20px; color: #2c3e50;">Manage Salary</h3>
+                        <form id="salary-form">
+                            <div class="form-group">
+                                <label for="salary-month">Select Month</label>
+                                <input type="month" id="salary-month" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="salary-amount">Salary Amount (MYR)</label>
+                                <input type="number" id="salary-amount" step="0.01" placeholder="0.00" required>
+                            </div>
+                            <button type="submit" class="btn">Save Salary</button>
+                        </form>
                     </div>
                     <div class="expenses-list" id="category-breakdown">
-                        <h3 style="margin-bottom: 20px; color: #2c3e50;">Category Breakdown</h3>
+                        <h3 style="margin-bottom: 20px; color: #2c3e50;">Category Breakdown (All Time)</h3>
                         <div id="category-list"></div>
                     </div>
                 </div>
@@ -294,11 +309,25 @@
 
         let allExpenses = [];
         let allCategories = [];
+        let allSalaries = {};
         const presetIcons = [ '🏡', '💡', '💧', '🌐', '🛋️', '📺', '🚗', '⛽', '🛣️', '🅿️', '🔧', '📱', '🎬', '🎵', '🧸', '🍼', '🛒', '🧽', '💳', '📦', '🍴', '🛵', '🎮', '🎥', '⚽', '🎸', '🏥', '💊', '🏋️', '💰', '📈', '📶', '👨‍👩‍👦' ];
 
         async function addToDB(collectionName, data) {
             if (isViewOnlyMode) return false;
             try { await fb.addDoc(fb.collection(db, collectionName), data); return true; } catch (error) { console.error(`Error adding to ${collectionName}:`, error); alert(`Failed to add ${collectionName.slice(0, -1)}.`); return false; }
+        }
+        
+        async function setInDB(collectionName, docId, data) {
+            if (isViewOnlyMode) return false;
+            try {
+                const docRef = fb.doc(db, collectionName, docId);
+                await fb.setDoc(docRef, data, { merge: true }); // Using merge to avoid overwriting other fields if any
+                return true;
+            } catch (error) {
+                console.error(`Error setting document in ${collectionName}:`, error);
+                alert(`Failed to save ${collectionName.slice(0, -1)}.`);
+                return false;
+            }
         }
 
         async function deleteFromDB(collectionName, id) {
@@ -321,6 +350,15 @@
             try { await fb.deleteDoc(docRef); } catch (error) { console.error(`Error deleting document from ${collectionName}:`, error); }
         }
 
+        function listenForSalaries() {
+            fb.onSnapshot(fb.collection(db, "salaries"), (snapshot) => {
+                allSalaries = {};
+                snapshot.docs.forEach(doc => {
+                    allSalaries[doc.id] = doc.data();
+                });
+                updateDisplay();
+            });
+        }
         function listenForCategories() {
             const q = fb.query(fb.collection(db, "categories"), fb.orderBy("name", "asc"));
             fb.onSnapshot(q, (snapshot) => {
@@ -357,6 +395,26 @@
             if (success) { this.reset(); clearFileInput(); flatpickr("#date").setDate("today"); alert('Expense added!'); document.querySelectorAll('.tab[data-tab-name="view"]')[0].click(); }
             submitBtn.disabled = false; submitBtn.textContent = 'Add Expense';
             document.getElementById('progress-container').style.display = 'none'; document.getElementById('progress-bar').style.width = '0%';
+        });
+        
+        document.getElementById('salary-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const monthYear = document.getElementById('salary-month').value;
+            const amount = parseFloat(document.getElementById('salary-amount').value);
+            if (!monthYear || isNaN(amount)) {
+                return alert("Please select a month and enter a valid salary amount.");
+            }
+
+            const success = await setInDB("salaries", monthYear, { amount });
+            if (success) {
+                alert(`Salary for ${monthYear} saved!`);
+                this.reset();
+                 // Set salary month input to the current month
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = (today.getMonth() + 1).toString().padStart(2, '0');
+                document.getElementById('salary-month').value = `${year}-${month}`;
+            }
         });
 
         document.getElementById('category-form').addEventListener('submit', async function(e) {
@@ -454,25 +512,22 @@
             document.getElementById('total-amount').textContent = `RM ${totalAmount.toFixed(2)}`;
             
             const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth();
+            const currentMonthStr = `${currentYear}-${(currentMonth + 1).toString().padStart(2, '0')}`;
+
             const monthExpenses = allExpenses.filter(exp => {
                 const d = new Date(exp.date);
-                return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+                return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
             });
             const monthTotal = monthExpenses.reduce((sum, exp) => sum + exp.amount, 0);
             document.getElementById('month-amount').textContent = `RM ${monthTotal.toFixed(2)}`;
 
-            let prevMonth = now.getMonth() - 1;
-            let prevMonthYear = now.getFullYear();
-            if (prevMonth < 0) {
-                prevMonth = 11; // December
-                prevMonthYear--;
-            }
-            const previousMonthExpenses = allExpenses.filter(exp => {
-                const d = new Date(exp.date);
-                return d.getMonth() === prevMonth && d.getFullYear() === prevMonthYear;
-            });
-            const previousMonthTotal = previousMonthExpenses.reduce((sum, exp) => sum + exp.amount, 0);
-            document.getElementById('previous-month-amount').textContent = `RM ${previousMonthTotal.toFixed(2)}`;
+            const currentMonthSalary = allSalaries[currentMonthStr] ? allSalaries[currentMonthStr].amount : 0;
+            document.getElementById('month-salary').textContent = `RM ${currentMonthSalary.toFixed(2)}`;
+
+            const remainingBalance = currentMonthSalary - monthTotal;
+            document.getElementById('remaining-balance').textContent = `RM ${remainingBalance.toFixed(2)}`;
             
             const categoryTotals = allExpenses.reduce((acc, exp) => { acc[exp.category] = (acc[exp.category] || 0) + exp.amount; return acc; }, {});
             const list = document.getElementById('category-list');
@@ -531,7 +586,7 @@
         function formatDate(dateStr) { const d = new Date(dateStr); return d.toLocaleDateString('en-MY', { timeZone: 'UTC', year: 'numeric', month: 'long', day: 'numeric' }); }
         function exportData() {
             if (isViewOnlyMode) return;
-            const dataStr = JSON.stringify({ expenses: allExpenses, categories: allCategories }, null, 2);
+            const dataStr = JSON.stringify({ expenses: allExpenses, categories: allCategories, salaries: allSalaries }, null, 2);
             const blob = new Blob([dataStr], { type: 'application/json' }); const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href = url; a.download = `expenses_data_${new Date().toISOString().split('T')[0]}.json`;
             a.click(); URL.revokeObjectURL(url);
@@ -589,6 +644,7 @@
             document.getElementById('header-subtitle').textContent = "View-Only Access";
             document.querySelector('.tab[data-tab-name="add"]').style.display = 'none';
             document.querySelector('.tab[data-tab-name="categories"]').style.display = 'none';
+            document.getElementById('salary-section').style.display = 'none';
             document.querySelector('.export-btn').style.display = 'none';
             document.querySelectorAll('.tab[data-tab-name="view"]')[0].click();
         }
@@ -709,8 +765,15 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             flatpickr("#date", { dateFormat: "Y-m-d", defaultDate: "today" });
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = (today.getMonth() + 1).toString().padStart(2, '0');
+            document.getElementById('salary-month').value = `${year}-${month}`;
+            
             populateIconGrid('icon-preset-grid', 'selected-icon');
-            listenForCategories(); listenForExpenses();
+            listenForSalaries();
+            listenForCategories();
+            listenForExpenses();
             setupViewOnlyUI();
         });
     </script>
