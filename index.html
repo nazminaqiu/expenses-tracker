@@ -10,7 +10,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, deleteDoc, updateDoc, query, orderBy, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, deleteDoc, updateDoc, query, orderBy, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
         import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
 
         // ==================================================================================
@@ -529,7 +529,6 @@
 
             const monthExpenses = allExpenses.filter(exp => exp.date.startsWith(currentMonthStr));
             const monthTotalExpenses = monthExpenses.reduce((sum, exp) => sum + exp.amount, 0);
-            const totalAllTimeExpenses = allExpenses.reduce((sum, exp) => sum + exp.amount, 0);
 
             const currentMonthSalary = allSalaries[currentMonthStr] ? allSalaries[currentMonthStr].amount : 0;
             const remainingFromSalary = currentMonthSalary - monthTotalExpenses;
@@ -545,20 +544,60 @@
             
             const breakdownTitle = document.getElementById('category-breakdown-title');
             const list = document.getElementById('category-list');
-            const expensesForBreakdown = (categoryBreakdownView === 'month') ? monthExpenses : allExpenses;
-            const totalForBreakdown = (categoryBreakdownView === 'month') ? monthTotalExpenses : totalAllTimeExpenses;
             
             breakdownTitle.textContent = `Category Breakdown (${categoryBreakdownView === 'month' ? 'This Month' : 'All Time'})`;
-            const categoryTotals = expensesForBreakdown.reduce((acc, exp) => { acc[exp.category] = (acc[exp.category] || 0) + exp.amount; return acc; }, {});
+            
+            if (categoryBreakdownView === 'month') {
+                const categoryTotals = monthExpenses.reduce((acc, exp) => { acc[exp.category] = (acc[exp.category] || 0) + exp.amount; return acc; }, {});
+                
+                if (allCategories.length === 0) {
+                     list.innerHTML = '<p style="color: #8898aa;">No categories to display. Add a category first.</p>';
+                     return;
+                }
 
-            if (Object.keys(categoryTotals).length === 0) {
-                list.innerHTML = '<p style="color: #8898aa;">No expenses to analyze for this period.</p>';
-            } else {
-                list.innerHTML = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]).map(([name, amount]) => {
-                    const pct = totalForBreakdown > 0 ? (amount / totalForBreakdown * 100).toFixed(1) : 0;
-                    const icon = allCategories.find(c => c.name === name)?.icon || '📌';
-                    return `<div class="expense-item category-breakdown-item"><div><span class="expense-category">${icon} ${name}</span></div><div><span style="font-weight: 700;">RM ${amount.toFixed(2)}</span><span style="color: #8898aa; font-size: 14px;"> (${pct}%)</span></div></div>`;
+                list.innerHTML = allCategories.map(cat => {
+                    const spentAmount = categoryTotals[cat.name] || 0;
+                    if(spentAmount === 0 && !budgetsForMonth[cat.name]) return ''; // Hide categories with no activity or budget this month
+
+                    const budgetAmount = budgetsForMonth[cat.name] || 0;
+                    const remaining = budgetAmount - spentAmount;
+                    const progress = budgetAmount > 0 ? (spentAmount / budgetAmount) * 100 : (spentAmount > 0 ? 101 : 0);
+
+                    return `
+                    <div class="expense-item">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                             <span class="expense-category" style="font-size: 15px;">${cat.icon} ${cat.name}</span>
+                             <span style="font-weight: 700; font-size: 16px;">RM ${spentAmount.toFixed(2)}</span>
+                        </div>
+                        <div class="budget-item-details">
+                            <div class="budget-progress-bar-container">
+                                <div class="budget-progress-bar ${progress > 100 ? 'over' : 'normal'}" style="width: ${Math.min(progress, 100)}%;"></div>
+                            </div>
+                            <div class="budget-info">
+                                <span>Budget: RM ${budgetAmount.toFixed(2)}</span>
+                                <span class="budget-remaining ${remaining < 0 ? 'negative' : ''}">Remaining: RM ${remaining.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    </div>`;
                 }).join('');
+
+            } else { // All Time View
+                const totalAllTimeExpenses = allExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+                const categoryTotals = allExpenses.reduce((acc, exp) => { acc[exp.category] = (acc[exp.category] || 0) + exp.amount; return acc; }, {});
+
+                if (Object.keys(categoryTotals).length === 0) {
+                    list.innerHTML = '<p style="color: #8898aa;">No expenses to analyze for this period.</p>';
+                } else {
+                    list.innerHTML = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]).map(([name, amount]) => {
+                        const pct = totalAllTimeExpenses > 0 ? (amount / totalAllTimeExpenses * 100).toFixed(1) : 0;
+                        const icon = allCategories.find(c => c.name === name)?.icon || '📌';
+                        return `<div class="expense-item category-breakdown-item"><div><span class="expense-category">${icon} ${name}</span></div><div><span style="font-weight: 700;">RM ${amount.toFixed(2)}</span><span style="color: #8898aa; font-size: 14px;"> (${pct}%)</span></div></div>`;
+                    }).join('');
+                }
+            }
+
+            if (!list.innerHTML.trim()) {
+                 list.innerHTML = '<p style="color: #8898aa;">No expenses to analyze for this period.</p>';
             }
         }
 
@@ -576,7 +615,7 @@
                 const budgetAmount = budgetsForMonth[cat.name] || 0;
                 const spentAmount = expensesForMonth.filter(e => e.category === cat.name).reduce((sum, e) => sum + e.amount, 0);
                 const remaining = budgetAmount - spentAmount;
-                const progress = budgetAmount > 0 ? (spentAmount / budgetAmount) * 100 : 0;
+                const progress = budgetAmount > 0 ? (spentAmount / budgetAmount) * 100 : (spentAmount > 0 ? 101 : 0);
 
                 return `
                 <div class="expense-item">
