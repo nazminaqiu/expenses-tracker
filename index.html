@@ -83,7 +83,8 @@
         .expense-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px; }
         .expense-category { display: inline-block; padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; text-transform: capitalize; letter-spacing: 0.5px; background: #dfe6e9; color: #2d3436; }
         .expense-amount { font-size: 24px; font-weight: 700; color: #2c3e50; }
-        .expense-details { color: #657786; font-size: 14px; line-height: 1.6; }
+        .expense-details { color: #657786; font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; }
+        .expense-details img { max-width: 100%; border-radius: 10px; margin-top: 10px; border: 2px solid #e1e8ed; }
         .expense-date { color: #8898aa; font-size: 13px; margin-top: 10px; }
         .receipt-link { color: #667eea; text-decoration: none; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; margin-top: 10px; transition: color 0.3s ease; }
         .receipt-link:hover { color: #764ba2; }
@@ -441,7 +442,7 @@
             fb.onSnapshot(q, (snapshot) => {
                 allExpenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-                if (isInitialExpenseLoad && allExpenses.length > 0) {
+                if (isInitialExpenseLoad) {
                     populateMonthFilter();
                     const select = document.getElementById('filter-month');
                     const now = new Date();
@@ -541,8 +542,10 @@
 
 
         function updateDisplay() {
-            populateMonthFilter();
-            filterExpenses();
+            if(!isInitialExpenseLoad) {
+                populateMonthFilter();
+                filterExpenses();
+            }
             updateSummary();
             displayCategories();
             displayBudgets();
@@ -559,6 +562,10 @@
             list.innerHTML = expensesToShow.map(exp => {
                 const category = allCategories.find(c => c.name === exp.category);
                 const icon = category ? category.icon : '📌';
+                
+                let descriptionHTML = exp.description || '';
+                descriptionHTML = descriptionHTML.replace(/!\[.*?\]\((.*?)\)/g, `<img src="$1" alt="Pasted Image" />`);
+                
                 const actionButtons = isViewOnlyMode ? '' : `
                     <div class="expense-actions" style="margin-top: 15px; display: flex; gap: 10px;">
                         <button class="btn" style="padding: 8px 12px; font-size: 14px; background: #ffc107;" onclick="showEditExpenseModal('${exp.id}')">Edit</button>
@@ -570,7 +577,7 @@
                         <div><span class="expense-category">${icon} ${exp.category}</span></div>
                         <div class="expense-amount">RM ${exp.amount.toFixed(2)}</div>
                     </div>
-                    <div class="expense-details">${exp.description}</div>
+                    <div class="expense-details">${descriptionHTML}</div>
                     <div class="expense-date">📅 ${formatDate(exp.date)}</div>
                     ${exp.receipt ? `<a href="${exp.receipt}" target="_blank" rel="noopener noreferrer" class="receipt-link">View Receipt</a>` : ''}
                     ${actionButtons}
