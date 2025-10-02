@@ -199,8 +199,8 @@
                     <div class="expenses-list" id="category-breakdown">
                         <div class="view-toggle">
                             <h3 id="category-breakdown-title" style="margin-bottom: 0; color: #2c3e50; flex-grow: 1;">Category Breakdown</h3>
-                            <button id="view-month-btn" class="btn view-btn">This Month</button>
-                            <button id="view-all-btn" class="btn view-btn active">All Time</button>
+                            <button id="view-month-btn" class="btn view-btn active">This Month</button>
+                            <button id="view-all-btn" class="btn view-btn">All Time</button>
                         </div>
                         <div id="category-list"></div>
                     </div>
@@ -298,7 +298,7 @@
         let allExpenses = [];
         let allCategories = [];
         let allSalaries = {};
-        let categoryBreakdownView = 'allTime'; // 'month' or 'allTime'
+        let categoryBreakdownView = 'month'; // 'month' or 'allTime'
         const presetIcons = [ '🏡', '💡', '💧', '🌐', '🛋️', '📺', '🚗', '⛽', '🛣️', '🅿️', '🔧', '📱', '🎬', '🎵', '🧸', '🍼', '🛒', '🧽', '💳', '📦', '🍴', '🛵', '🎮', '🎥', '⚽', '🎸', '🏥', '💊', '🏋️', '💰', '📈', '📶', '👨‍👩‍👦' ];
 
         async function addToDB(collectionName, data) {
@@ -338,11 +338,24 @@
             }
             try { await fb.deleteDoc(docRef); } catch (error) { console.error(`Error deleting document from ${collectionName}:`, error); }
         }
+        
+        function updateSalaryInputForMonth(monthStr) {
+            const salaryAmountInput = document.getElementById('salary-amount');
+            if (allSalaries && allSalaries[monthStr]) {
+                salaryAmountInput.value = parseFloat(allSalaries[monthStr].amount).toFixed(2);
+            } else {
+                salaryAmountInput.value = '';
+            }
+        }
 
         function listenForSalaries() {
             fb.onSnapshot(fb.collection(db, "salaries"), (snapshot) => {
                 allSalaries = {};
                 snapshot.docs.forEach(doc => { allSalaries[doc.id] = doc.data(); });
+                const currentSelectedMonth = document.getElementById('salary-month').value;
+                if (currentSelectedMonth) {
+                    updateSalaryInputForMonth(currentSelectedMonth);
+                }
                 updateDisplay();
             });
         }
@@ -392,8 +405,6 @@
             const success = await setInDB("salaries", monthYear, { amount });
             if (success) {
                 alert(`Salary for ${monthYear} saved!`);
-                this.reset();
-                flatpickr("#salary-month").setDate(new Date());
             }
         });
 
@@ -686,7 +697,10 @@
             flatpickr("#date", { dateFormat: "Y-m-d", defaultDate: "today" });
             flatpickr("#salary-month", {
                 plugins: [ new monthSelectPlugin({ shorthand: true, dateFormat: "Y-m" }) ],
-                defaultDate: new Date()
+                defaultDate: new Date(),
+                onChange: function(selectedDates, dateStr, instance) {
+                    updateSalaryInputForMonth(dateStr);
+                }
             });
             
             document.getElementById('view-month-btn').addEventListener('click', () => {
