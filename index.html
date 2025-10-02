@@ -141,10 +141,7 @@
         .btn-small { padding: 10px 15px; font-size: 14px; }
         #receipt-preview-container { margin-top: 15px; text-align: center; }
         #receipt-preview-container img { max-width: 100%; max-height: 200px; border-radius: 10px; border: 2px solid #e1e8ed; }
-        #paste-image-box, #edit-paste-image-box { border: 2px dashed #667eea; border-radius: 10px; min-height: 80px; padding: 10px; color: #667eea; text-align: center; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center;}
-        #paste-image-box:focus, #edit-paste-image-box:focus { outline: none; border-color: #764ba2; background: rgba(102, 126, 234, 0.05); }
-
-
+       
         @media (max-width: 768px) {
             .container { padding: 0 10px; }
             .content { padding: 20px 15px; }
@@ -194,8 +191,13 @@
                         <div class="form-group"><label for="amount">Amount (MYR)</label><input type="number" id="amount" step="0.01" placeholder="0.00" required></div>
                         <div class="form-group"><label for="description">Description</label><textarea id="description" rows="3" placeholder="Enter expense details..."></textarea></div>
                         <div class="form-group">
-                            <label for="paste-image-box">Paste Image Here (Optional)</label>
-                            <div id="paste-image-box" contenteditable="true">Click or paste here</div>
+                            <label for="pasted-image-upload">Upload or Paste Image (Optional)</label>
+                            <div class="file-upload" id="pasted-image-upload-wrapper">
+                                <input type="file" id="pasted-image-upload" accept="image/*">
+                                <label for="pasted-image-upload" class="file-upload-label" id="paste-image-box">
+                                    <span>🎨 Click to Upload or Paste Image</span>
+                                </label>
+                            </div>
                             <input type="hidden" id="hidden-pasted-image-url">
                             <div id="pasted-image-preview-container" style="display:none; margin-top: 10px; text-align: center;"></div>
                         </div>
@@ -360,15 +362,20 @@
                 </div>
                 <div class="form-group">
                     <label for="edit-description">Description</label>
-                    <textarea id="edit-description" rows="3" required></textarea>
+                    <textarea id="edit-description" rows="3"></textarea>
                 </div>
                 <div class="form-group">
-                    <label for="edit-paste-image-box">Paste Image Here (Optional)</label>
-                    <div id="edit-paste-image-box" contenteditable="true">Click or paste here</div>
+                    <label for="edit-pasted-image-upload">Upload or Paste Image (Optional)</label>
+                    <div class="file-upload" id="edit-pasted-image-upload-wrapper">
+                        <input type="file" id="edit-pasted-image-upload" accept="image/*">
+                        <label for="edit-pasted-image-upload" class="file-upload-label" id="edit-paste-image-box">
+                            <span>🎨 Click to Upload or Paste Image</span>
+                        </label>
+                    </div>
                     <div id="edit-pasted-image-preview-container" style="display:none; margin-top: 10px; text-align: center;"></div>
                 </div>
                 <div class="form-group">
-                    <label>Receipt</label>
+                    <label>Upload Receipt/Proof</label>
                     <div id="existing-receipt-container">
                         <a id="existing-receipt-link" href="#" target="_blank" rel="noopener noreferrer" class="receipt-link">View Current Receipt</a>
                         <button type="button" id="remove-receipt-btn" class="delete-btn">Remove Receipt</button>
@@ -590,18 +597,19 @@
             const hiddenInputId = (formType === 'add') ? 'hidden-pasted-image-url' : 'hidden-edit-pasted-image-url';
             const previewContainerId = (formType === 'add') ? 'pasted-image-preview-container' : 'edit-pasted-image-preview-container';
             const pasteBoxId = (formType === 'add') ? 'paste-image-box' : 'edit-paste-image-box';
+            const fileInputId = (formType === 'add') ? 'pasted-image-upload' : 'edit-pasted-image-upload';
 
             const hiddenUrlInput = document.getElementById(hiddenInputId);
             const fileUrl = hiddenUrlInput.value;
             
             if (deleteFromStorage && fileUrl) {
-                if (!confirm("Are you sure you want to remove this pasted image?")) return;
+                 if (!confirm("Are you sure you want to remove this pasted image?")) return;
                 try {
                     await fb.deleteObject(fb.ref(storage, fileUrl));
                 } catch (error) {
                     console.error("Error deleting pasted image from Storage:", error);
                     alert("Could not delete the pasted image. Please try again.");
-                    return; // Stop if deletion fails
+                    return;
                 }
             }
             
@@ -609,7 +617,12 @@
             const previewContainer = document.getElementById(previewContainerId);
             previewContainer.innerHTML = '';
             previewContainer.style.display = 'none';
-            document.getElementById(pasteBoxId).style.display = 'flex';
+
+            const pasteBox = document.getElementById(pasteBoxId);
+            pasteBox.parentElement.style.display = 'flex'; // Show the file-upload div
+            pasteBox.querySelector('span').textContent = '🎨 Click to Upload or Paste Image';
+
+            document.getElementById(fileInputId).value = '';
         }
 
 
@@ -949,7 +962,7 @@
                 previewContainer.innerHTML = `<img src="${expense.pastedImage}" alt="Pasted preview" style="max-width: 100%; max-height: 150px; border-radius: 5px;">
                                               <button type="button" onclick="clearPastedImage(true, 'edit')" class="remove-file-btn" style="display:inline-block; margin-left: 10px;">&times;</button>`;
                 previewContainer.style.display = 'block';
-                document.getElementById('edit-paste-image-box').style.display = 'none';
+                document.getElementById('edit-pasted-image-upload-wrapper').style.display = 'none';
             } else {
                 clearPastedImage(false, 'edit');
             }
@@ -1056,35 +1069,26 @@
             }
         });
         
-        async function handlePaste(event, formType = 'add') {
-            const items = (event.clipboardData || window.clipboardData).items;
-            let imageFile = null;
-            for (const item of items) {
-                if (item.type.startsWith('image/')) {
-                    imageFile = item.getAsFile();
-                    break;
-                }
-            }
-            if (!imageFile) return;
-            event.preventDefault();
-            
-            const pasteBoxId = (formType === 'add') ? 'paste-image-box' : 'edit-paste-image-box';
+        async function handleImageUpload(file, formType) {
             const hiddenInputId = (formType === 'add') ? 'hidden-pasted-image-url' : 'hidden-edit-pasted-image-url';
             const previewContainerId = (formType === 'add') ? 'pasted-image-preview-container' : 'edit-pasted-image-preview-container';
+            const uploadWrapperId = (formType === 'add') ? 'pasted-image-upload-wrapper' : 'edit-pasted-image-upload-wrapper';
 
-            const pasteBox = document.getElementById(pasteBoxId);
             const hiddenInput = document.getElementById(hiddenInputId);
             const previewContainer = document.getElementById(previewContainerId);
-
-            pasteBox.textContent = 'Uploading...';
-            pasteBox.style.pointerEvents = 'none';
+            const uploadWrapper = document.getElementById(uploadWrapperId);
+            
+            const pasteBox = uploadWrapper.querySelector('.file-upload-label');
+            const originalText = pasteBox.querySelector('span').textContent;
+            pasteBox.querySelector('span').textContent = 'Uploading...';
+            uploadWrapper.style.pointerEvents = 'none';
             
             try {
-                const storageRef = fb.ref(storage, `pasted_images/${Date.now()}_${imageFile.name}`);
-                const uploadTask = fb.uploadBytesResumable(storageRef, imageFile);
+                const storageRef = fb.ref(storage, `pasted_images/${Date.now()}_${file.name}`);
+                const uploadTask = fb.uploadBytesResumable(storageRef, file);
                 const downloadURL = await new Promise((resolve, reject) => {
                     uploadTask.on('state_changed', null, 
-                        (error) => { console.error("Upload failed:", error); reject(error); }, 
+                        (error) => reject(error), 
                         async () => {
                             const url = await fb.getDownloadURL(uploadTask.snapshot.ref);
                             resolve(url);
@@ -1096,16 +1100,16 @@
                 previewContainer.innerHTML = `<img src="${downloadURL}" alt="Pasted preview" style="max-width: 100%; max-height: 150px; border-radius: 5px;">
                                               <button type="button" onclick="clearPastedImage(true, '${formType}')" class="remove-file-btn" style="display:inline-block; margin-left: 10px;">&times;</button>`;
                 previewContainer.style.display = 'block';
-                pasteBox.style.display = 'none';
+                uploadWrapper.style.display = 'none';
                 
             } catch (error) {
-                alert("Failed to upload pasted image. Please try again.");
-                pasteBox.textContent = 'Click or paste here';
+                console.error("Image upload failed:", error);
+                alert("Failed to upload image. Please try again.");
+                pasteBox.querySelector('span').textContent = originalText;
             } finally {
-                pasteBox.style.pointerEvents = 'auto';
+                uploadWrapper.style.pointerEvents = 'auto';
             }
         }
-
 
         document.addEventListener('DOMContentLoaded', () => {
             flatpickr("#date", { dateFormat: "Y-m-d", defaultDate: "today" });
@@ -1176,8 +1180,40 @@
             });
             
             document.getElementById('category').addEventListener('change', updateAddExpenseBudgetInfo);
-            document.getElementById('paste-image-box').addEventListener('paste', (e) => handlePaste(e, 'add'));
-            document.getElementById('edit-paste-image-box').addEventListener('paste', (e) => handlePaste(e, 'edit'));
+            
+            document.getElementById('paste-image-box').addEventListener('paste', (e) => {
+                const items = (e.clipboardData || window.clipboardData).items;
+                for (const item of items) {
+                    if (item.type.startsWith('image/')) {
+                        e.preventDefault();
+                        handleImageUpload(item.getAsFile(), 'add');
+                        return;
+                    }
+                }
+            });
+            
+            document.getElementById('pasted-image-upload').addEventListener('change', function(e) {
+                if(this.files && this.files[0]){
+                    handleImageUpload(this.files[0], 'add');
+                }
+            });
+            
+            document.getElementById('edit-paste-image-box').addEventListener('paste', (e) => {
+                 const items = (e.clipboardData || window.clipboardData).items;
+                for (const item of items) {
+                    if (item.type.startsWith('image/')) {
+                        e.preventDefault();
+                        handleImageUpload(item.getAsFile(), 'edit');
+                        return;
+                    }
+                }
+            });
+
+            document.getElementById('edit-pasted-image-upload').addEventListener('change', function(e) {
+                if(this.files && this.files[0]){
+                    handleImageUpload(this.files[0], 'edit');
+                }
+            });
 
 
             populateIconGrid('icon-preset-grid', 'selected-icon');
