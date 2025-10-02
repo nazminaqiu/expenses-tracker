@@ -110,11 +110,13 @@
         .no-expenses-icon { font-size: 48px; margin-bottom: 20px; opacity: 0.5; }
         .export-btn { background: linear-gradient(135deg, #00b894, #00cec9); margin-left: 10px; }
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); display: none; align-items: center; justify-content: center; z-index: 1000; }
-        .modal-content { background: white; padding: 30px; border-radius: 20px; width: 90%; max-width: 500px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); animation: fadeIn 0.3s ease; }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; color: #2c3e50; }
+        .modal-content { background: white; border-radius: 20px; width: 90%; max-width: 500px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); animation: fadeIn 0.3s ease; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
+        .modal-header { padding: 20px 30px; flex-shrink: 0; border-bottom: 1px solid #e1e8ed; display: flex; justify-content: space-between; align-items: center; }
         .modal-close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: #8898aa; }
         #image-modal .modal-close-btn { position: absolute; top: 15px; right: 15px; font-size: 30px; color: white; background: rgba(0,0,0,0.5); border-radius: 50%; width: 40px; height: 40px; line-height: 40px; text-align: center; }
-        .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
+        .modal-body { overflow-y: auto; padding: 20px 30px; flex-grow: 1; }
+        .modal-buttons { padding: 20px 30px; flex-shrink: 0; border-top: 1px solid #e1e8ed; display: flex; gap: 10px; }
+        #edit-expense-form { display: flex; flex-direction: column; height: 100%; }
         .progress-bar-container { width: 100%; height: 10px; background-color: #e1e8ed; border-radius: 5px; overflow: hidden; margin-top: 10px; display: none; }
         .progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); transition: width 0.3s ease; }
         #icon-preset-grid, #edit-icon-preset-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
@@ -141,7 +143,7 @@
         .btn-small { padding: 10px 15px; font-size: 14px; }
         #receipt-preview-container { margin-top: 15px; text-align: center; }
         #receipt-preview-container img { max-width: 100%; max-height: 200px; border-radius: 10px; border: 2px solid #e1e8ed; }
-       
+
         @media (max-width: 768px) {
             .container { padding: 0 10px; }
             .content { padding: 20px 15px; }
@@ -321,15 +323,17 @@
 
 
     <div id="edit-category-modal" class="modal-overlay">
-        <div class="modal-content">
+        <div class="modal-content" style="padding:0;">
             <div class="modal-header"><h2>Edit Category</h2><button class="modal-close-btn" onclick="hideEditModal()">&times;</button></div>
             <form id="edit-category-form">
-                <input type="hidden" id="edit-category-id">
-                <div class="form-group"><label for="edit-category-name">Category Name</label><input type="text" id="edit-category-name" required></div>
-                <div class="form-group">
-                    <label>Choose an Icon</label>
-                    <div id="edit-icon-preset-grid"></div>
-                    <input type="hidden" id="edit-selected-icon" required>
+                <div class="modal-body">
+                    <input type="hidden" id="edit-category-id">
+                    <div class="form-group"><label for="edit-category-name">Category Name</label><input type="text" id="edit-category-name" required></div>
+                    <div class="form-group">
+                        <label>Choose an Icon</label>
+                        <div id="edit-icon-preset-grid"></div>
+                        <input type="hidden" id="edit-selected-icon" required>
+                    </div>
                 </div>
                 <div class="modal-buttons">
                     <button type="submit" class="btn">Save Changes</button>
@@ -340,54 +344,56 @@
     </div>
 
     <div id="edit-expense-modal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Edit Expense</h2>
-                <button class="modal-close-btn" onclick="hideEditExpenseModal()">&times;</button>
-            </div>
+        <div class="modal-content" style="padding:0;">
             <form id="edit-expense-form">
-                <input type="hidden" id="edit-expense-id">
-                <input type="hidden" id="hidden-edit-pasted-image-url">
-                <div class="form-group">
-                    <label for="edit-date">Date</label>
-                    <input type="date" id="edit-date" required>
+                <div class="modal-header">
+                    <h2>Edit Expense</h2>
+                    <button type="button" class="modal-close-btn" onclick="hideEditExpenseModal()">&times;</button>
                 </div>
-                <div class="form-group">
-                    <label for="edit-category">Category</label>
-                    <select id="edit-category" required></select>
-                </div>
-                <div class="form-group">
-                    <label for="edit-amount">Amount (MYR)</label>
-                    <input type="number" id="edit-amount" step="0.01" required>
-                </div>
-                <div class="form-group">
-                    <label for="edit-description">Description</label>
-                    <textarea id="edit-description" rows="3"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="edit-pasted-image-upload">Upload or Paste Image (Optional)</label>
-                    <div class="file-upload" id="edit-pasted-image-upload-wrapper">
-                        <input type="file" id="edit-pasted-image-upload" accept="image/*">
-                        <label for="edit-pasted-image-upload" class="file-upload-label" id="edit-paste-image-box">
-                            <span>🎨 Click to Upload or Paste Image</span>
-                        </label>
+                <div class="modal-body">
+                    <input type="hidden" id="edit-expense-id">
+                    <input type="hidden" id="hidden-edit-pasted-image-url">
+                    <div class="form-group">
+                        <label for="edit-date">Date</label>
+                        <input type="date" id="edit-date" required>
                     </div>
-                    <div id="edit-pasted-image-preview-container" style="display:none; margin-top: 10px; text-align: center;"></div>
-                </div>
-                <div class="form-group">
-                    <label>Upload Receipt/Proof</label>
-                    <div id="existing-receipt-container">
-                        <a id="existing-receipt-link" href="#" target="_blank" rel="noopener noreferrer" class="receipt-link">View Current Receipt</a>
-                        <button type="button" id="remove-receipt-btn" class="delete-btn">Remove Receipt</button>
+                    <div class="form-group">
+                        <label for="edit-category">Category</label>
+                        <select id="edit-category" required></select>
                     </div>
-                    <div class="file-upload">
-                        <input type="file" id="edit-receipt" accept="image/*,.pdf">
-                        <label for="edit-receipt" class="file-upload-label" id="edit-file-label">
-                            <span id="edit-file-label-default">📁 Click to upload a new receipt</span>
-                            <span id="edit-file-label-selected" style="display: none;"></span>
-                        </label>
+                    <div class="form-group">
+                        <label for="edit-amount">Amount (MYR)</label>
+                        <input type="number" id="edit-amount" step="0.01" required>
                     </div>
-                     <div class="progress-bar-container" id="edit-progress-container"><div class="progress-bar" id="edit-progress-bar"></div></div>
+                    <div class="form-group">
+                        <label for="edit-description">Description</label>
+                        <textarea id="edit-description" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                         <label for="edit-pasted-image-upload">Upload or Paste Image (Optional)</label>
+                        <div class="file-upload" id="edit-pasted-image-upload-wrapper">
+                            <input type="file" id="edit-pasted-image-upload" accept="image/*">
+                            <label for="edit-pasted-image-upload" class="file-upload-label" id="edit-paste-image-box">
+                                <span>🎨 Click to Upload or Paste Image</span>
+                            </label>
+                        </div>
+                        <div id="edit-pasted-image-preview-container" style="display:none; margin-top: 10px; text-align: center;"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Upload Receipt/Proof</label>
+                        <div id="existing-receipt-container" style="display:none;">
+                            <a id="existing-receipt-link" href="#" target="_blank" rel="noopener noreferrer" class="receipt-link">View Current Receipt</a>
+                            <button type="button" id="remove-receipt-btn" class="delete-btn">Remove Receipt</button>
+                        </div>
+                        <div class="file-upload">
+                            <input type="file" id="edit-receipt" accept="image/*,.pdf">
+                            <label for="edit-receipt" class="file-upload-label" id="edit-file-label">
+                                <span id="edit-file-label-default">📁 Click to upload a new receipt</span>
+                                <span id="edit-file-label-selected" style="display: none;"></span>
+                            </label>
+                        </div>
+                         <div class="progress-bar-container" id="edit-progress-container"><div class="progress-bar" id="edit-progress-bar"></div></div>
+                    </div>
                 </div>
                 <div class="modal-buttons">
                     <button type="submit" class="btn">Save Changes</button>
@@ -596,8 +602,7 @@
         async function clearPastedImage(deleteFromStorage = true, formType = 'add') {
             const hiddenInputId = (formType === 'add') ? 'hidden-pasted-image-url' : 'hidden-edit-pasted-image-url';
             const previewContainerId = (formType === 'add') ? 'pasted-image-preview-container' : 'edit-pasted-image-preview-container';
-            const pasteBoxId = (formType === 'add') ? 'paste-image-box' : 'edit-paste-image-box';
-            const fileInputId = (formType === 'add') ? 'pasted-image-upload' : 'edit-pasted-image-upload';
+            const uploadWrapperId = (formType === 'add') ? 'pasted-image-upload-wrapper' : 'edit-pasted-image-upload-wrapper';
 
             const hiddenUrlInput = document.getElementById(hiddenInputId);
             const fileUrl = hiddenUrlInput.value;
@@ -617,12 +622,7 @@
             const previewContainer = document.getElementById(previewContainerId);
             previewContainer.innerHTML = '';
             previewContainer.style.display = 'none';
-
-            const pasteBox = document.getElementById(pasteBoxId);
-            pasteBox.parentElement.style.display = 'flex'; // Show the file-upload div
-            pasteBox.querySelector('span').textContent = '🎨 Click to Upload or Paste Image';
-
-            document.getElementById(fileInputId).value = '';
+            document.getElementById(uploadWrapperId).style.display = 'flex';
         }
 
 
