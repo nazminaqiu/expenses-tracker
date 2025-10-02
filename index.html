@@ -72,7 +72,7 @@
         .btn:active { transform: translateY(0); }
         .btn:disabled { background: #b0bec5; cursor: not-allowed; }
         .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .summary-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 25px; border-radius: 15px; color: white; box-shadow: 0 10px 30px rgba(0,0,0,0.2); transform: translateY(0); transition: all 0.3s ease; }
+        .summary-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 25px; border-radius: 15px; color: white; box-shadow: 0 10px 30px rgba(0,0,0,0.2); transform: translateY(0); transition: all 0.3s ease; cursor: help; }
         .summary-card:hover { transform: translateY(-5px); box-shadow: 0 15px 40px rgba(0,0,0,0.3); }
         .summary-card h3 { font-size: 14px; opacity: 0.9; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
         .summary-card .amount { font-size: 32px; font-weight: 700; }
@@ -209,10 +209,22 @@
                 <div id="summary-tab" class="tab-content">
                     <h2 id="summary-month-header" style="text-align: center; margin-bottom: 25px; color: #2c3e50;"></h2>
                     <div class="summary-cards">
-                        <div class="summary-card"><h3>This Month's Salary</h3><div class="amount" id="month-salary">RM 0.00</div></div>
-                        <div class="summary-card"><h3>This Month's Expenses</h3><div class="amount" id="month-amount">RM 0.00</div></div>
-                        <div class="summary-card"><h3>Remaining from Salary</h3><div class="amount" id="remaining-balance">RM 0.00</div></div>
-                        <div class="summary-card"><h3>Budget Remaining</h3><div class="amount" id="budget-remaining-balance">RM 0.00</div></div>
+                        <div class="summary-card" title="The total salary you have entered for the current month.">
+                            <h3>This Month's Salary</h3>
+                            <div class="amount" id="month-salary">RM 0.00</div>
+                        </div>
+                        <div class="summary-card" title="The sum of all expenses you have recorded in the current month.">
+                            <h3>This Month's Expenses</h3>
+                            <div class="amount" id="month-amount">RM 0.00</div>
+                        </div>
+                        <div class="summary-card" title="Calculation: This Month's Salary - This Month's Expenses.">
+                            <h3>Remaining from Salary</h3>
+                            <div class="amount" id="remaining-balance">RM 0.00</div>
+                        </div>
+                        <div class="summary-card" title="Calculation: Total Monthly Budget - This Month's Expenses.">
+                            <h3>Budget Remaining</h3>
+                            <div class="amount" id="budget-remaining-balance">RM 0.00</div>
+                        </div>
                     </div>
                     <div id="salary-section" class="expenses-list" style="margin-bottom: 30px;">
                         <h3 style="margin-bottom: 20px; color: #2c3e50;">Manage Salary</h3>
@@ -241,6 +253,20 @@
                     <div class="form-group">
                         <label for="budget-month">Select month to view/edit budget</label>
                         <input type="text" id="budget-month" required>
+                    </div>
+                    <div class="summary-cards" style="margin-top:30px; margin-bottom: 30px;">
+                        <div class="summary-card">
+                            <h3>Total Budget</h3>
+                            <div class="amount" id="budget-total-amount">RM 0.00</div>
+                        </div>
+                        <div class="summary-card">
+                            <h3>Total Spent</h3>
+                            <div class="amount" id="budget-spent-amount">RM 0.00</div>
+                        </div>
+                        <div class="summary-card">
+                            <h3>Overall Remaining</h3>
+                            <div class="amount" id="budget-overall-remaining">RM 0.00</div>
+                        </div>
                     </div>
                     <div class="expenses-list" id="budget-list"></div>
                 </div>
@@ -329,7 +355,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/plugins/monthSelect/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/plugins/monthSelect/index.js"></script>
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const isViewOnlyMode = urlParams.get('view') === 'true';
@@ -593,19 +619,33 @@
         function displayBudgets() {
             const month = document.getElementById('budget-month').value;
             const list = document.getElementById('budget-list');
-            if (!month) { list.innerHTML = `<p style="text-align: center; color: #8898aa;">Please select a month to manage budgets.</p>`; return; }
-
+            const totalBudgetEl = document.getElementById('budget-total-amount');
+            const totalSpentEl = document.getElementById('budget-spent-amount');
+            const overallRemainingEl = document.getElementById('budget-overall-remaining');
+            if (!month) {
+                list.innerHTML = `<p style="text-align: center; color: #8898aa;">Please select a month to manage budgets.</p>`;
+                totalBudgetEl.textContent = 'RM 0.00';
+                totalSpentEl.textContent = 'RM 0.00';
+                overallRemainingEl.textContent = 'RM 0.00';
+                return;
+            }
             const expensesForMonth = allExpenses.filter(e => e.date.startsWith(month));
             const budgetsForMonth = allBudgets[month] || {};
-
-            if (allCategories.length === 0) { list.innerHTML = `<p style="text-align: center; color: #8898aa;">Please add some categories first.</p>`; return; }
-            
+            const totalBudgetForMonth = Object.values(budgetsForMonth).reduce((sum, val) => sum + val, 0);
+            const totalSpentForMonth = expensesForMonth.reduce((sum, exp) => sum + exp.amount, 0);
+            const overallRemaining = totalBudgetForMonth - totalSpentForMonth;
+            totalBudgetEl.textContent = `RM ${totalBudgetForMonth.toFixed(2)}`;
+            totalSpentEl.textContent = `RM ${totalSpentForMonth.toFixed(2)}`;
+            overallRemainingEl.textContent = `RM ${overallRemaining.toFixed(2)}`;
+            if (allCategories.length === 0) {
+                list.innerHTML = `<p style="text-align: center; color: #8898aa;">Please add some categories first.</p>`;
+                return;
+            }
             list.innerHTML = allCategories.map(cat => {
                 const budgetAmount = budgetsForMonth[cat.name] || 0;
                 const spentAmount = expensesForMonth.filter(e => e.category === cat.name).reduce((sum, e) => sum + e.amount, 0);
                 const remaining = budgetAmount - spentAmount;
                 const progress = budgetAmount > 0 ? (spentAmount / budgetAmount) * 100 : (spentAmount > 0 ? 101 : 0);
-
                 return `
                 <div class="expense-item">
                     <div class="budget-item">
@@ -823,7 +863,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             flatpickr("#date", { dateFormat: "Y-m-d", defaultDate: "today" });
             const monthPickerConfig = {
-                plugins: [ new monthSelectPlugin({ shorthand: true, dateFormat: "Y-m" }) ],
+                plugins: [ new monthSelectPlugin({ shorthand: true, dateFormat: "Y-m", altFormat: "F Y" }) ],
                 defaultDate: new Date()
             };
             flatpickr("#salary-month", { ...monthPickerConfig, onChange: (selectedDates, dateStr) => updateSalaryInputForMonth(dateStr) });
