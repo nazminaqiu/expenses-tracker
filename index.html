@@ -949,6 +949,43 @@
                 }
             }
         });
+        
+        async function handlePaste(event) {
+            const items = (event.clipboardData || window.clipboardData).items;
+            let imageFile = null;
+            for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                    imageFile = item.getAsFile();
+                    break;
+                }
+            }
+            if (!imageFile) return;
+            event.preventDefault();
+            const targetTextarea = event.target;
+            const originalPlaceholder = targetTextarea.placeholder;
+            targetTextarea.disabled = true;
+            targetTextarea.placeholder = "Uploading image...";
+            try {
+                const storageRef = fb.ref(storage, `pasted_images/${Date.now()}_${imageFile.name}`);
+                const uploadTask = fb.uploadBytesResumable(storageRef, imageFile);
+                const downloadURL = await new Promise((resolve, reject) => {
+                    uploadTask.on('state_changed', null, 
+                        (error) => { console.error("Upload failed:", error); reject(error); }, 
+                        async () => {
+                            const url = await fb.getDownloadURL(uploadTask.snapshot.ref);
+                            resolve(url);
+                        }
+                    );
+                });
+                const markdownLink = `![Pasted Image](${downloadURL})`;
+                targetTextarea.value += (targetTextarea.value ? '\n' : '') + markdownLink;
+            } catch (error) {
+                alert("Failed to upload pasted image. Please try again.");
+            } finally {
+                targetTextarea.disabled = false;
+                targetTextarea.placeholder = originalPlaceholder;
+            }
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
             flatpickr("#date", { dateFormat: "Y-m-d", defaultDate: "today" });
@@ -1019,6 +1056,9 @@
             });
             
             document.getElementById('category').addEventListener('change', updateAddExpenseBudgetInfo);
+            document.getElementById('description').addEventListener('paste', handlePaste);
+            document.getElementById('edit-description').addEventListener('paste', handlePaste);
+
 
             populateIconGrid('icon-preset-grid', 'selected-icon');
             listenForSalaries();
