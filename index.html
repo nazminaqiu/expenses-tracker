@@ -195,6 +195,9 @@
                                 </label>
                                 <button type="button" id="remove-file-btn" class="remove-file-btn" style="display: none;">&times;</button>
                             </div>
+                            <div id="receipt-preview-container" style="margin-top: 15px; display: none;">
+                                <img id="receipt-preview" src="#" alt="Receipt Preview" style="max-width: 100%; max-height: 200px; border-radius: 10px; object-fit: cover;">
+                            </div>
                             <div class="progress-bar-container" id="progress-container"><div class="progress-bar" id="progress-bar"></div></div>
                         </div>
                         <button type="submit" class="btn">Add Expense</button>
@@ -352,6 +355,9 @@
                             <span id="edit-file-label-selected" style="display: none;"></span>
                         </label>
                     </div>
+                     <div id="edit-receipt-preview-container" style="margin-top: 15px; display: none;">
+                        <img id="edit-receipt-preview" src="#" alt="New Receipt Preview" style="max-width: 100%; max-height: 200px; border-radius: 10px; object-fit: cover;">
+                    </div>
                      <div class="progress-bar-container" id="edit-progress-container"><div class="progress-bar" id="edit-progress-bar"></div></div>
                 </div>
                 <div class="modal-buttons">
@@ -409,6 +415,7 @@
                 snapshot.docs.forEach(doc => { allBudgets[doc.id] = doc.data(); });
                 displayBudgets();
                 updateSummary();
+                updateAddExpenseBudgetInfo();
             });
         }
 
@@ -435,7 +442,10 @@
         }
         function listenForExpenses() {
             const q = fb.query(fb.collection(db, "expenses"), fb.orderBy("date", "desc"));
-            fb.onSnapshot(q, (snapshot) => { allExpenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); updateDisplay(); });
+            fb.onSnapshot(q, (snapshot) => {
+                allExpenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                updateDisplay();
+            });
         }
 
         document.getElementById('expense-form').addEventListener('submit', async function(e) {
@@ -494,13 +504,28 @@
         
         document.getElementById('receipt').addEventListener('change', function() {
             const file = this.files[0];
+            const previewContainer = document.getElementById('receipt-preview-container');
+            const previewImage = document.getElementById('receipt-preview');
             if (file) {
                 document.getElementById('file-label-default').style.display = 'none';
-                const selectedLabel = document.getElementById('file-label-selected');
-                selectedLabel.textContent = file.name.length > 30 ? `${file.name.substring(0, 27)}...` : file.name;
-                selectedLabel.style.display = 'inline';
+                document.getElementById('file-label-selected').textContent = file.name.length > 30 ? `${file.name.substring(0, 27)}...` : file.name;
+                document.getElementById('file-label-selected').style.display = 'inline';
                 document.getElementById('remove-file-btn').style.display = 'inline-block';
-            } else { clearFileInput(); }
+
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        previewImage.src = e.target.result;
+                        previewContainer.style.display = 'block';
+                    }
+                    reader.readAsDataURL(file);
+                } else {
+                    previewContainer.style.display = 'none';
+                    previewImage.src = '#';
+                }
+            } else {
+                clearFileInput();
+            }
         });
 
         document.getElementById('remove-file-btn').addEventListener('click', clearFileInput);
@@ -509,6 +534,10 @@
             document.getElementById('file-label-default').style.display = 'inline';
             document.getElementById('file-label-selected').style.display = 'none';
             document.getElementById('remove-file-btn').style.display = 'none';
+            const previewContainer = document.getElementById('receipt-preview-container');
+            const previewImage = document.getElementById('receipt-preview');
+            previewContainer.style.display = 'none';
+            previewImage.src = '#';
         }
 
         function updateDisplay() { filterExpenses(); updateSummary(); displayCategories(); populateMonthFilter(); displayBudgets(); updateAddExpenseBudgetInfo(); }
@@ -829,7 +858,13 @@
             flatpickr("#edit-date", { dateFormat: "Y-m-d" });
         }
 
-        function hideEditExpenseModal() { document.getElementById('edit-expense-modal').style.display = 'none'; }
+        function hideEditExpenseModal() {
+            document.getElementById('edit-expense-modal').style.display = 'none';
+            const previewContainer = document.getElementById('edit-receipt-preview-container');
+            const previewImage = document.getElementById('edit-receipt-preview');
+            previewContainer.style.display = 'none';
+            previewImage.src = '#';
+        }
 
         function setupViewOnlyUI() {
             if (!isViewOnlyMode) return;
@@ -879,13 +914,30 @@
 
         document.getElementById('edit-receipt').addEventListener('change', function() {
             const file = this.files[0];
+            const previewContainer = document.getElementById('edit-receipt-preview-container');
+            const previewImage = document.getElementById('edit-receipt-preview');
+
             if (file) {
                 document.getElementById('edit-file-label-default').style.display = 'none';
                 document.getElementById('edit-file-label-selected').textContent = file.name.length > 30 ? `${file.name.substring(0, 27)}...` : file.name;
                 document.getElementById('edit-file-label-selected').style.display = 'inline';
+
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        previewImage.src = e.target.result;
+                        previewContainer.style.display = 'block';
+                    }
+                    reader.readAsDataURL(file);
+                } else {
+                    previewContainer.style.display = 'none';
+                    previewImage.src = '#';
+                }
             } else {
                 document.getElementById('edit-file-label-default').style.display = 'inline';
                 document.getElementById('edit-file-label-selected').style.display = 'none';
+                previewContainer.style.display = 'none';
+                previewImage.src = '#';
             }
         });
 
