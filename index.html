@@ -10,7 +10,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, deleteDoc, updateDoc, query, orderBy, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, getDoc, deleteDoc, updateDoc, query, orderBy, setDoc } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
         import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-storage.js";
 
         // ==================================================================================
@@ -526,43 +526,32 @@
         function updateSummary() {
             const now = new Date();
             const currentMonthStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
-
             const monthExpenses = allExpenses.filter(exp => exp.date.startsWith(currentMonthStr));
             const monthTotalExpenses = monthExpenses.reduce((sum, exp) => sum + exp.amount, 0);
-
             const currentMonthSalary = allSalaries[currentMonthStr] ? allSalaries[currentMonthStr].amount : 0;
             const remainingFromSalary = currentMonthSalary - monthTotalExpenses;
-            
             const currentMonthBudgets = allBudgets[currentMonthStr] || {};
             const totalMonthBudget = Object.values(currentMonthBudgets).reduce((sum, val) => sum + val, 0);
             const remainingFromBudget = totalMonthBudget - monthTotalExpenses;
-
             document.getElementById('month-amount').textContent = `RM ${monthTotalExpenses.toFixed(2)}`;
             document.getElementById('month-salary').textContent = `RM ${currentMonthSalary.toFixed(2)}`;
             document.getElementById('remaining-balance').textContent = `RM ${remainingFromSalary.toFixed(2)}`;
             document.getElementById('budget-remaining-balance').textContent = `RM ${remainingFromBudget.toFixed(2)}`;
-            
             const breakdownTitle = document.getElementById('category-breakdown-title');
             const list = document.getElementById('category-list');
-            
             breakdownTitle.textContent = `Category Breakdown (${categoryBreakdownView === 'month' ? 'This Month' : 'All Time'})`;
-            
             if (categoryBreakdownView === 'month') {
                 const categoryTotals = monthExpenses.reduce((acc, exp) => { acc[exp.category] = (acc[exp.category] || 0) + exp.amount; return acc; }, {});
-                
                 if (allCategories.length === 0) {
-                     list.innerHTML = '<p style="color: #8898aa;">No categories to display. Add a category first.</p>';
-                     return;
+                    list.innerHTML = '<p style="color: #8898aa;">No categories to display. Add a category first.</p>';
+                    return;
                 }
-
                 list.innerHTML = allCategories.map(cat => {
                     const spentAmount = categoryTotals[cat.name] || 0;
-                    if(spentAmount === 0 && !budgetsForMonth[cat.name]) return ''; // Hide categories with no activity or budget this month
-
-                    const budgetAmount = budgetsForMonth[cat.name] || 0;
+                    const budgetAmount = currentMonthBudgets[cat.name] || 0;
+                    if (spentAmount === 0 && budgetAmount === 0) return '';
                     const remaining = budgetAmount - spentAmount;
                     const progress = budgetAmount > 0 ? (spentAmount / budgetAmount) * 100 : (spentAmount > 0 ? 101 : 0);
-
                     return `
                     <div class="expense-item">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
@@ -580,11 +569,9 @@
                         </div>
                     </div>`;
                 }).join('');
-
-            } else { // All Time View
+            } else {
                 const totalAllTimeExpenses = allExpenses.reduce((sum, exp) => sum + exp.amount, 0);
                 const categoryTotals = allExpenses.reduce((acc, exp) => { acc[exp.category] = (acc[exp.category] || 0) + exp.amount; return acc; }, {});
-
                 if (Object.keys(categoryTotals).length === 0) {
                     list.innerHTML = '<p style="color: #8898aa;">No expenses to analyze for this period.</p>';
                 } else {
@@ -595,9 +582,8 @@
                     }).join('');
                 }
             }
-
             if (!list.innerHTML.trim()) {
-                 list.innerHTML = '<p style="color: #8898aa;">No expenses to analyze for this period.</p>';
+                list.innerHTML = '<p style="color: #8898aa;">No activity to display for this period.</p>';
             }
         }
 
