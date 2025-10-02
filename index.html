@@ -136,6 +136,8 @@
         .budget-input-group { display: flex; align-items: center; gap: 10px; }
         .budget-input-group input { flex-grow: 1; }
         .btn-small { padding: 10px 15px; font-size: 14px; }
+        #receipt-preview-container { margin-top: 15px; text-align: center; }
+        #receipt-preview-container img { max-width: 100%; max-height: 200px; border-radius: 10px; border: 2px solid #e1e8ed; }
 
         @media (max-width: 768px) {
             .container { padding: 0 10px; }
@@ -187,18 +189,15 @@
                         <div class="form-group"><label for="description">Description</label><textarea id="description" rows="3" placeholder="Enter expense details..."></textarea></div>
                         <div class="form-group">
                             <label for="receipt">Upload Receipt/Proof</label>
+                            <input type="hidden" id="hidden-receipt-url">
                             <div class="file-upload">
                                 <input type="file" id="receipt" accept="image/*,.pdf">
-                                <label for="receipt" class="file-upload-label" id="file-label">
-                                    <span id="file-label-default">📁 Click to upload receipt (optional)</span>
-                                    <span id="file-label-selected" style="display: none;"></span>
+                                <label for="receipt" class="file-upload-label">
+                                    <span id="file-label-text">📁 Click to upload receipt (optional)</span>
                                 </label>
-                                <button type="button" id="remove-file-btn" class="remove-file-btn" style="display: none;">&times;</button>
-                            </div>
-                            <div id="receipt-preview-container" style="margin-top: 15px; display: none;">
-                                <img id="receipt-preview" src="#" alt="Receipt Preview" style="max-width: 100%; max-height: 200px; border-radius: 10px; object-fit: cover;">
                             </div>
                             <div class="progress-bar-container" id="progress-container"><div class="progress-bar" id="progress-bar"></div></div>
+                            <div id="receipt-preview-container" style="display:none;"></div>
                         </div>
                         <button type="submit" class="btn">Add Expense</button>
                     </form>
@@ -355,9 +354,6 @@
                             <span id="edit-file-label-selected" style="display: none;"></span>
                         </label>
                     </div>
-                     <div id="edit-receipt-preview-container" style="margin-top: 15px; display: none;">
-                        <img id="edit-receipt-preview" src="#" alt="New Receipt Preview" style="max-width: 100%; max-height: 200px; border-radius: 10px; object-fit: cover;">
-                    </div>
                      <div class="progress-bar-container" id="edit-progress-container"><div class="progress-bar" id="edit-progress-bar"></div></div>
                 </div>
                 <div class="modal-buttons">
@@ -415,7 +411,6 @@
                 snapshot.docs.forEach(doc => { allBudgets[doc.id] = doc.data(); });
                 displayBudgets();
                 updateSummary();
-                updateAddExpenseBudgetInfo();
             });
         }
 
@@ -442,36 +437,37 @@
         }
         function listenForExpenses() {
             const q = fb.query(fb.collection(db, "expenses"), fb.orderBy("date", "desc"));
-            fb.onSnapshot(q, (snapshot) => {
-                allExpenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                updateDisplay();
-            });
+            fb.onSnapshot(q, (snapshot) => { allExpenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); updateDisplay(); });
         }
 
         document.getElementById('expense-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             const submitBtn = this.querySelector('button[type="submit"]');
             submitBtn.disabled = true; submitBtn.textContent = 'Saving...';
-            const fileInput = document.getElementById('receipt');
-            let receiptURL = null;
-            if (fileInput.files[0]) {
-                const file = fileInput.files[0];
-                const storageRef = fb.ref(storage, `receipts/${Date.now()}_${file.name}`);
-                const uploadTask = fb.uploadBytesResumable(storageRef, file);
-                const progressContainer = document.getElementById('progress-container');
-                const progressBar = document.getElementById('progress-bar');
-                progressContainer.style.display = 'block';
-                await new Promise((resolve, reject) => {
-                    uploadTask.on('state_changed', (snapshot) => { progressBar.style.width = `${(snapshot.bytesTransferred / snapshot.totalBytes) * 100}%`; }, 
-                    (error) => { console.error("Upload failed:", error); reject(error); }, 
-                    async () => { receiptURL = await fb.getDownloadURL(uploadTask.snapshot.ref); resolve(); });
-                });
-            }
-            const expense = { date: document.getElementById('date').value, category: document.getElementById('category').value, amount: parseFloat(document.getElementById('amount').value), description: document.getElementById('description').value, receipt: receiptURL, timestamp: new Date().toISOString() };
+            
+            const receiptURL = document.getElementById('hidden-receipt-url').value || null;
+            
+            const expense = { 
+                date: document.getElementById('date').value, 
+                category: document.getElementById('category').value, 
+                amount: parseFloat(document.getElementById('amount').value), 
+                description: document.getElementById('description').value, 
+                receipt: receiptURL, 
+                timestamp: new Date().toISOString() 
+            };
+
             const success = await fb.addDoc(fb.collection(db, "expenses"), expense);
-            if (success) { this.reset(); clearFileInput(); flatpickr("#date").setDate("today"); alert('Expense added!'); document.querySelectorAll('.tab[data-tab-name="view"]')[0].click(); }
-            submitBtn.disabled = false; submitBtn.textContent = 'Add Expense';
-            document.getElementById('progress-container').style.display = 'none'; document.getElementById('progress-bar').style.width = '0%';
+            
+            if (success) { 
+                this.reset(); 
+                clearFileInput(false); // Don't delete file from storage
+                flatpickr("#date").setDate("today"); 
+                alert('Expense added!'); 
+                document.querySelectorAll('.tab[data-tab-name="view"]')[0].click(); 
+            }
+            
+            submitBtn.disabled = false; 
+            submitBtn.textContent = 'Add Expense';
         });
         
         document.getElementById('salary-form').addEventListener('submit', async function(e) {
@@ -502,43 +498,30 @@
             try { await fb.updateDoc(fb.doc(db, "categories", id), updatedData); alert("Category updated!"); hideEditModal(); } catch (error) { console.error("Error updating category:", error); alert("Failed to update category."); }
         });
         
-        document.getElementById('receipt').addEventListener('change', function() {
-            const file = this.files[0];
-            const previewContainer = document.getElementById('receipt-preview-container');
-            const previewImage = document.getElementById('receipt-preview');
-            if (file) {
-                document.getElementById('file-label-default').style.display = 'none';
-                document.getElementById('file-label-selected').textContent = file.name.length > 30 ? `${file.name.substring(0, 27)}...` : file.name;
-                document.getElementById('file-label-selected').style.display = 'inline';
-                document.getElementById('remove-file-btn').style.display = 'inline-block';
+        async function clearFileInput(deleteFromStorage = true) {
+            const hiddenUrlInput = document.getElementById('hidden-receipt-url');
+            const fileUrl = hiddenUrlInput.value;
 
-                if (file.type.startsWith('image/')) {
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        previewImage.src = e.target.result;
-                        previewContainer.style.display = 'block';
-                    }
-                    reader.readAsDataURL(file);
-                } else {
-                    previewContainer.style.display = 'none';
-                    previewImage.src = '#';
+            if (deleteFromStorage && fileUrl) {
+                if (!confirm("Are you sure you want to remove this receipt? It will be deleted permanently.")) return;
+                try {
+                    const fileRef = fb.ref(storage, fileUrl);
+                    await fb.deleteObject(fileRef);
+                    console.log("File deleted from Storage.");
+                } catch (error) {
+                    console.error("Error deleting file from Storage:", error);
+                    alert("Could not delete the file. Please try again.");
                 }
-            } else {
-                clearFileInput();
             }
-        });
-
-        document.getElementById('remove-file-btn').addEventListener('click', clearFileInput);
-        function clearFileInput() {
+            
             document.getElementById('receipt').value = '';
-            document.getElementById('file-label-default').style.display = 'inline';
-            document.getElementById('file-label-selected').style.display = 'none';
-            document.getElementById('remove-file-btn').style.display = 'none';
+            hiddenUrlInput.value = '';
+            document.getElementById('file-label-text').textContent = '📁 Click to upload receipt (optional)';
             const previewContainer = document.getElementById('receipt-preview-container');
-            const previewImage = document.getElementById('receipt-preview');
+            previewContainer.innerHTML = '';
             previewContainer.style.display = 'none';
-            previewImage.src = '#';
         }
+
 
         function updateDisplay() { filterExpenses(); updateSummary(); displayCategories(); populateMonthFilter(); displayBudgets(); updateAddExpenseBudgetInfo(); }
 
@@ -858,13 +841,7 @@
             flatpickr("#edit-date", { dateFormat: "Y-m-d" });
         }
 
-        function hideEditExpenseModal() {
-            document.getElementById('edit-expense-modal').style.display = 'none';
-            const previewContainer = document.getElementById('edit-receipt-preview-container');
-            const previewImage = document.getElementById('edit-receipt-preview');
-            previewContainer.style.display = 'none';
-            previewImage.src = '#';
-        }
+        function hideEditExpenseModal() { document.getElementById('edit-expense-modal').style.display = 'none'; }
 
         function setupViewOnlyUI() {
             if (!isViewOnlyMode) return;
@@ -914,30 +891,13 @@
 
         document.getElementById('edit-receipt').addEventListener('change', function() {
             const file = this.files[0];
-            const previewContainer = document.getElementById('edit-receipt-preview-container');
-            const previewImage = document.getElementById('edit-receipt-preview');
-
             if (file) {
                 document.getElementById('edit-file-label-default').style.display = 'none';
                 document.getElementById('edit-file-label-selected').textContent = file.name.length > 30 ? `${file.name.substring(0, 27)}...` : file.name;
                 document.getElementById('edit-file-label-selected').style.display = 'inline';
-
-                if (file.type.startsWith('image/')) {
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        previewImage.src = e.target.result;
-                        previewContainer.style.display = 'block';
-                    }
-                    reader.readAsDataURL(file);
-                } else {
-                    previewContainer.style.display = 'none';
-                    previewImage.src = '#';
-                }
             } else {
                 document.getElementById('edit-file-label-default').style.display = 'inline';
                 document.getElementById('edit-file-label-selected').style.display = 'none';
-                previewContainer.style.display = 'none';
-                previewImage.src = '#';
             }
         });
 
@@ -966,6 +926,51 @@
             flatpickr("#salary-month", { ...monthPickerConfig, onChange: (selectedDates, dateStr) => updateSalaryInputForMonth(dateStr) });
             flatpickr("#budget-month", { ...monthPickerConfig, onChange: () => displayBudgets() });
             
+            document.getElementById('receipt').addEventListener('change', async function() {
+                if (this.files.length === 0) return;
+                const file = this.files[0];
+                const hiddenUrlInput = document.getElementById('hidden-receipt-url');
+                const progressContainer = document.getElementById('progress-container');
+                const progressBar = document.getElementById('progress-bar');
+                const previewContainer = document.getElementById('receipt-preview-container');
+                const fileLabel = document.getElementById('file-label-text');
+
+                progressContainer.style.display = 'block';
+                progressBar.style.width = '0%';
+                fileLabel.textContent = `Uploading ${file.name}...`;
+
+                const storageRef = fb.ref(storage, `receipts/${Date.now()}_${file.name}`);
+                const uploadTask = fb.uploadBytesResumable(storageRef, file);
+
+                uploadTask.on('state_changed', 
+                    (snapshot) => {
+                        progressBar.style.width = `${(snapshot.bytesTransferred / snapshot.totalBytes) * 100}%`;
+                    }, 
+                    (error) => {
+                        console.error("Upload failed:", error);
+                        alert("File upload failed. Please try again.");
+                        clearFileInput(false);
+                    }, 
+                    async () => {
+                        const downloadURL = await fb.getDownloadURL(uploadTask.snapshot.ref);
+                        hiddenUrlInput.value = downloadURL;
+                        progressContainer.style.display = 'none';
+                        fileLabel.textContent = file.name;
+                        
+                        let previewContent = '';
+                        if (file.type.startsWith('image/')) {
+                            previewContent = `<img src="${downloadURL}" alt="Receipt preview">`;
+                        } else {
+                            previewContent = `<a href="${downloadURL}" target="_blank" class="receipt-link" style="margin-top: 0;">View Uploaded File</a>`;
+                        }
+                        previewContent += `<button type="button" onclick="clearFileInput(true)" class="remove-file-btn" style="display:inline-block; margin-left: 10px;">&times;</button>`;
+                        
+                        previewContainer.innerHTML = previewContent;
+                        previewContainer.style.display = 'block';
+                    }
+                );
+            });
+
             document.getElementById('view-month-btn').addEventListener('click', () => {
                 categoryBreakdownView = 'month';
                 document.getElementById('view-month-btn').classList.add('active');
