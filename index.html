@@ -63,6 +63,7 @@
         .file-upload { position: relative; display: flex; align-items: center; }
         .file-upload input[type=file] { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
         .file-upload-label { display: block; flex-grow: 1; padding: 12px; border: 2px dashed #667eea; border-radius: 10px; text-align: center; color: #667eea; font-weight: 600; transition: all 0.3s ease; }
+        .file-upload-label[contenteditable]:focus { outline: none; } /* Hide focus ring for paste boxes */
         .file-upload:hover .file-upload-label { background: rgba(102, 126, 234, 0.05); border-color: #764ba2; }
         #file-label-selected { color: #2c3e50; font-weight: normal; font-style: italic; }
         .remove-file-btn { background: #e74c3c; color: white; border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 18px; line-height: 28px; cursor: pointer; margin-left: -40px; z-index: 2; transition: all 0.2s ease; }
@@ -116,7 +117,6 @@
         #image-modal .modal-close-btn { position: absolute; top: 15px; right: 15px; font-size: 30px; color: white; background: rgba(0,0,0,0.5); border-radius: 50%; width: 40px; height: 40px; line-height: 40px; text-align: center; }
         .modal-body { padding: 20px 30px; }
         .modal-buttons { padding: 20px 30px; flex-shrink: 0; border-top: 1px solid #e1e8ed; display: flex; gap: 10px; }
-        #edit-expense-form { /* Styles removed */ }
         .progress-bar-container { width: 100%; height: 10px; background-color: #e1e8ed; border-radius: 5px; overflow: hidden; margin-top: 10px; display: none; }
         .progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); transition: width 0.3s ease; }
         #icon-preset-grid, #edit-icon-preset-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
@@ -196,7 +196,7 @@
                             <label for="pasted-image-upload">Upload or Paste Image (Optional)</label>
                             <div class="file-upload" id="pasted-image-upload-wrapper">
                                 <input type="file" id="pasted-image-upload" accept="image/*">
-                                <label for="pasted-image-upload" class="file-upload-label" id="paste-image-box">
+                                <label for="pasted-image-upload" class="file-upload-label" id="paste-image-box" contenteditable="true">
                                     <span>🎨 Click to Upload or Paste Image</span>
                                 </label>
                             </div>
@@ -373,7 +373,7 @@
                          <label for="edit-pasted-image-upload">Upload or Paste Image (Optional)</label>
                         <div class="file-upload" id="edit-pasted-image-upload-wrapper">
                             <input type="file" id="edit-pasted-image-upload" accept="image/*">
-                            <label for="edit-pasted-image-upload" class="file-upload-label" id="edit-paste-image-box">
+                            <label for="edit-pasted-image-upload" class="file-upload-label" id="edit-paste-image-box" contenteditable="true">
                                 <span>🎨 Click to Upload or Paste Image</span>
                             </label>
                         </div>
@@ -415,6 +415,7 @@
         let allBudgets = {};
         let isInitialExpenseLoad = true;
         let categoryBreakdownView = 'month'; // 'month' or 'allTime'
+        let tempPastedImageUrl = null; // To track unsaved uploaded images in the edit modal
         const presetIcons = [ '🏡', '💡', '💧', '🌐', '🛋️', '📺', '🚗', '⛽', '🛣️', '🅿️', '🔧', '📱', '🎬', '🎵', '🧸', '🍼', '🛒', '🧽', '💳', '📦', '🍴', '🛵', '🎮', '🎥', '⚽', '🎸', '🏥', '💊', '🏋️', '💰', '📈', '📶', '👨‍👩‍👦' ];
 
         async function setInDB(collectionName, docId, data) {
@@ -948,6 +949,7 @@
         
         async function showEditExpenseModal(expenseId) {
             if (isViewOnlyMode) return;
+            tempPastedImageUrl = null; // Reset temp file tracker when opening modal
             const expense = allExpenses.find(exp => exp.id === expenseId);
             if (!expense) { alert("Expense not found!"); return; }
 
@@ -983,7 +985,14 @@
             flatpickr("#edit-date", { dateFormat: "Y-m-d" });
         }
 
-        function hideEditExpenseModal() { 
+        function hideEditExpenseModal() {
+            // If a temporary image was uploaded but not saved, delete it from storage
+            if (tempPastedImageUrl) {
+                fb.deleteObject(fb.ref(storage, tempPastedImageUrl)).catch(error => {
+                    console.error("Failed to delete temporary uploaded file on cancel:", error);
+                });
+                tempPastedImageUrl = null; // Reset tracker
+            }
             document.getElementById('edit-expense-modal').style.display = 'none';
             clearPastedImage(false, 'edit');
         }
@@ -1032,6 +1041,7 @@
             };
             try {
                 await fb.updateDoc(fb.doc(db, "expenses", expenseId), updatedData);
+                tempPastedImageUrl = null; // The image is now saved, so clear the temp tracker
                 alert("Expense updated successfully!"); hideEditExpenseModal();
             } catch (error) { console.error("Error updating expense:", error); alert("Failed to update expense.");
             } finally {
@@ -1097,6 +1107,10 @@
                 });
                 
                 hiddenInput.value = downloadURL;
+                if (formType === 'edit') {
+                    tempPastedImageUrl = downloadURL; // Track this as a temporary file
+                }
+
                 previewContainer.innerHTML = `<img src="${downloadURL}" alt="Pasted preview" style="max-width: 100%; max-height: 150px; border-radius: 5px;">
                                               <button type="button" onclick="clearPastedImage(true, '${formType}')" class="remove-file-btn" style="display:inline-block; margin-left: 10px;">&times;</button>`;
                 previewContainer.style.display = 'block';
