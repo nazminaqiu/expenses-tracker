@@ -63,7 +63,7 @@
         .file-upload { position: relative; display: flex; align-items: center; }
         .file-upload input[type=file] { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
         .file-upload-label { display: block; flex-grow: 1; padding: 12px; border: 2px dashed #667eea; border-radius: 10px; text-align: center; color: #667eea; font-weight: 600; transition: all 0.3s ease; }
-        .file-upload-label[contenteditable]:focus { outline: none; } /* Hide focus ring for paste boxes */
+        .file-upload-label[contenteditable]:focus { outline: none; }
         .file-upload:hover .file-upload-label { background: rgba(102, 126, 234, 0.05); border-color: #764ba2; }
         #file-label-selected { color: #2c3e50; font-weight: normal; font-style: italic; }
         .remove-file-btn { background: #e74c3c; color: white; border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 18px; line-height: 28px; cursor: pointer; margin-left: -40px; z-index: 2; transition: all 0.2s ease; }
@@ -196,8 +196,8 @@
                             <label for="pasted-image-upload">Upload or Paste Image (Optional)</label>
                             <div class="file-upload" id="pasted-image-upload-wrapper">
                                 <input type="file" id="pasted-image-upload" accept="image/*">
-                                <label for="pasted-image-upload" class="file-upload-label" id="paste-image-box" contenteditable="true">
-                                    <span>🎨 Click to Upload or Paste Image</span>
+                                <label for="pasted-image-upload" class="file-upload-label" id="paste-image-box">
+                                    <span><!-- Text will be set by script --></span>
                                 </label>
                             </div>
                             <input type="hidden" id="hidden-pasted-image-url">
@@ -373,8 +373,8 @@
                          <label for="edit-pasted-image-upload">Upload or Paste Image (Optional)</label>
                         <div class="file-upload" id="edit-pasted-image-upload-wrapper">
                             <input type="file" id="edit-pasted-image-upload" accept="image/*">
-                            <label for="edit-pasted-image-upload" class="file-upload-label" id="edit-paste-image-box" contenteditable="true">
-                                <span>🎨 Click to Upload or Paste Image</span>
+                            <label for="edit-pasted-image-upload" class="file-upload-label" id="edit-paste-image-box">
+                                <span><!-- Text will be set by script --></span>
                             </label>
                         </div>
                         <div id="edit-pasted-image-preview-container" style="display:none; margin-top: 10px; text-align: center;"></div>
@@ -415,7 +415,7 @@
         let allBudgets = {};
         let isInitialExpenseLoad = true;
         let categoryBreakdownView = 'month'; // 'month' or 'allTime'
-        let tempPastedImageUrl = null; // To track unsaved uploaded images in the edit modal
+        let tempPastedImageUrl = null; 
         const presetIcons = [ '🏡', '💡', '💧', '🌐', '🛋️', '📺', '🚗', '⛽', '🛣️', '🅿️', '🔧', '📱', '🎬', '🎵', '🧸', '🍼', '🛒', '🧽', '💳', '📦', '🍴', '🛵', '🎮', '🎥', '⚽', '🎸', '🏥', '💊', '🏋️', '💰', '📈', '📶', '👨‍👩‍👦' ];
 
         async function setInDB(collectionName, docId, data) {
@@ -949,7 +949,7 @@
         
         async function showEditExpenseModal(expenseId) {
             if (isViewOnlyMode) return;
-            tempPastedImageUrl = null; // Reset temp file tracker when opening modal
+            tempPastedImageUrl = null;
             const expense = allExpenses.find(exp => exp.id === expenseId);
             if (!expense) { alert("Expense not found!"); return; }
 
@@ -985,13 +985,12 @@
             flatpickr("#edit-date", { dateFormat: "Y-m-d" });
         }
 
-        function hideEditExpenseModal() {
-            // If a temporary image was uploaded but not saved, delete it from storage
+        function hideEditExpenseModal() { 
             if (tempPastedImageUrl) {
                 fb.deleteObject(fb.ref(storage, tempPastedImageUrl)).catch(error => {
                     console.error("Failed to delete temporary uploaded file on cancel:", error);
                 });
-                tempPastedImageUrl = null; // Reset tracker
+                tempPastedImageUrl = null;
             }
             document.getElementById('edit-expense-modal').style.display = 'none';
             clearPastedImage(false, 'edit');
@@ -1041,7 +1040,7 @@
             };
             try {
                 await fb.updateDoc(fb.doc(db, "expenses", expenseId), updatedData);
-                tempPastedImageUrl = null; // The image is now saved, so clear the temp tracker
+                tempPastedImageUrl = null;
                 alert("Expense updated successfully!"); hideEditExpenseModal();
             } catch (error) { console.error("Error updating expense:", error); alert("Failed to update expense.");
             } finally {
@@ -1108,7 +1107,7 @@
                 
                 hiddenInput.value = downloadURL;
                 if (formType === 'edit') {
-                    tempPastedImageUrl = downloadURL; // Track this as a temporary file
+                    tempPastedImageUrl = downloadURL;
                 }
 
                 previewContainer.innerHTML = `<img src="${downloadURL}" alt="Pasted preview" style="max-width: 100%; max-height: 150px; border-radius: 5px;">
@@ -1125,6 +1124,28 @@
             }
         }
 
+        function isMobileDevice() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+
+        function setupImageInputs() {
+            const isMobile = isMobileDevice();
+            const addPasteBox = document.getElementById('paste-image-box');
+            const editPasteBox = document.getElementById('edit-paste-image-box');
+            
+            if (isMobile) {
+                addPasteBox.contentEditable = false;
+                addPasteBox.querySelector('span').textContent = '🎨 Click to Upload Image';
+                editPasteBox.contentEditable = false;
+                editPasteBox.querySelector('span').textContent = '🎨 Click to Upload Image';
+            } else {
+                addPasteBox.contentEditable = true;
+                addPasteBox.querySelector('span').textContent = '🎨 Click to Upload or Paste Image';
+                editPasteBox.contentEditable = true;
+                editPasteBox.querySelector('span').textContent = '🎨 Click to Upload or Paste Image';
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             flatpickr("#date", { dateFormat: "Y-m-d", defaultDate: "today" });
             const monthPickerConfig = {
@@ -1134,6 +1155,8 @@
             flatpickr("#salary-month", { ...monthPickerConfig, onChange: (selectedDates, dateStr) => updateSalaryInputForMonth(dateStr) });
             flatpickr("#budget-month", { ...monthPickerConfig, onChange: () => displayBudgets() });
             
+            setupImageInputs();
+
             document.getElementById('receipt').addEventListener('change', async function() {
                 if (this.files.length === 0) return;
                 const file = this.files[0];
