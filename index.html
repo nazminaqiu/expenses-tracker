@@ -192,17 +192,35 @@
                         </div>
                         <div class="form-group"><label for="amount">Amount (MYR)</label><input type="number" id="amount" step="0.01" placeholder="0.00" required></div>
                         <div class="form-group"><label for="description">Description</label><textarea id="description" rows="3" placeholder="Enter expense details..."></textarea></div>
+                        
+                        <div class="form-group" id="add-image-source-selector">
+                            <label>Image Source (Optional)</label>
+                            <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 10px;">
+                                <label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="image-source" value="upload" checked> Upload Image</label>
+                                <label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="image-source" value="paste"> Paste Image</label>
+                            </div>
+                        </div>
+
                         <div class="form-group">
-                            <label for="pasted-image-upload">Upload or Paste Image (Optional)</label>
-                            <div class="file-upload" id="pasted-image-upload-wrapper">
-                                <input type="file" id="pasted-image-upload" accept="image/*">
-                                <label for="pasted-image-upload" class="file-upload-label" id="paste-image-box">
-                                    <span><!-- Text will be set by script --></span>
-                                </label>
+                            <div id="add-image-upload-container">
+                                <div class="file-upload">
+                                    <input type="file" id="pasted-image-upload" accept="image/*">
+                                    <label for="pasted-image-upload" class="file-upload-label">
+                                        <span>🎨 Click to Upload Image</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div id="add-image-paste-container" style="display: none;">
+                                 <div class="file-upload">
+                                    <div id="paste-image-box" class="file-upload-label" contenteditable="true">
+                                        <span>📋 Paste Image Here</span>
+                                    </div>
+                                 </div>
                             </div>
                             <input type="hidden" id="hidden-pasted-image-url">
                             <div id="pasted-image-preview-container" style="display:none; margin-top: 10px; text-align: center;"></div>
                         </div>
+
                         <div class="form-group">
                             <label for="receipt">Upload Receipt/Proof</label>
                             <input type="hidden" id="hidden-receipt-url">
@@ -369,16 +387,34 @@
                         <label for="edit-description">Description</label>
                         <textarea id="edit-description" rows="3"></textarea>
                     </div>
+
+                    <div class="form-group" id="edit-image-source-selector">
+                        <label>Image Source (Optional)</label>
+                        <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 10px;">
+                            <label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="edit-image-source" value="upload" checked> Upload Image</label>
+                            <label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="edit-image-source" value="paste"> Paste Image</label>
+                        </div>
+                    </div>
+
                     <div class="form-group">
-                         <label for="edit-pasted-image-upload">Upload or Paste Image (Optional)</label>
-                        <div class="file-upload" id="edit-pasted-image-upload-wrapper">
-                            <input type="file" id="edit-pasted-image-upload" accept="image/*">
-                            <label for="edit-pasted-image-upload" class="file-upload-label" id="edit-paste-image-box">
-                                <span><!-- Text will be set by script --></span>
-                            </label>
+                         <div id="edit-image-upload-container">
+                            <div class="file-upload">
+                                <input type="file" id="edit-pasted-image-upload" accept="image/*">
+                                <label for="edit-pasted-image-upload" class="file-upload-label">
+                                    <span>🎨 Click to Upload Image</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div id="edit-image-paste-container" style="display: none;">
+                             <div class="file-upload">
+                                <div id="edit-paste-image-box" class="file-upload-label" contenteditable="true">
+                                    <span>📋 Paste Image Here</span>
+                                </div>
+                             </div>
                         </div>
                         <div id="edit-pasted-image-preview-container" style="display:none; margin-top: 10px; text-align: center;"></div>
                     </div>
+
                     <div class="form-group">
                         <label>Upload Receipt/Proof</label>
                         <div id="existing-receipt-container" style="display:none;">
@@ -603,8 +639,7 @@
         async function clearPastedImage(deleteFromStorage = true, formType = 'add') {
             const hiddenInputId = (formType === 'add') ? 'hidden-pasted-image-url' : 'hidden-edit-pasted-image-url';
             const previewContainerId = (formType === 'add') ? 'pasted-image-preview-container' : 'edit-pasted-image-preview-container';
-            const uploadWrapperId = (formType === 'add') ? 'pasted-image-upload-wrapper' : 'edit-pasted-image-upload-wrapper';
-
+            
             const hiddenUrlInput = document.getElementById(hiddenInputId);
             const fileUrl = hiddenUrlInput.value;
             
@@ -623,7 +658,18 @@
             const previewContainer = document.getElementById(previewContainerId);
             previewContainer.innerHTML = '';
             previewContainer.style.display = 'none';
-            document.getElementById(uploadWrapperId).style.display = 'flex';
+            
+            if (formType === 'add') {
+                document.getElementById('add-image-source-selector').style.display = 'block';
+                document.querySelector('input[name="image-source"][value="upload"]').checked = true;
+                document.getElementById('add-image-upload-container').style.display = 'block';
+                document.getElementById('add-image-paste-container').style.display = 'none';
+            } else { // formType === 'edit'
+                document.getElementById('edit-image-source-selector').style.display = 'block';
+                document.querySelector('input[name="edit-image-source"][value="upload"]').checked = true;
+                document.getElementById('edit-image-upload-container').style.display = 'block';
+                document.getElementById('edit-image-paste-container').style.display = 'none';
+            }
         }
 
 
@@ -964,11 +1010,12 @@
                 previewContainer.innerHTML = `<img src="${expense.pastedImage}" alt="Pasted preview" style="max-width: 100%; max-height: 150px; border-radius: 5px;">
                                               <button type="button" onclick="clearPastedImage(true, 'edit')" class="remove-file-btn" style="display:inline-block; margin-left: 10px;">&times;</button>`;
                 previewContainer.style.display = 'block';
-                document.getElementById('edit-pasted-image-upload-wrapper').style.display = 'none';
+                document.getElementById('edit-image-source-selector').style.display = 'none';
+                document.getElementById('edit-image-upload-container').style.display = 'none';
+                document.getElementById('edit-image-paste-container').style.display = 'none';
             } else {
                 clearPastedImage(false, 'edit');
             }
-
 
             const categorySelect = document.getElementById('edit-category');
             categorySelect.innerHTML = allCategories.map(c => `<option value="${c.name}" ${expense.category === c.name ? 'selected' : ''}>${c.icon} ${c.name}</option>`).join('');
@@ -993,7 +1040,6 @@
                 tempPastedImageUrl = null;
             }
             document.getElementById('edit-expense-modal').style.display = 'none';
-            clearPastedImage(false, 'edit');
         }
 
         function setupViewOnlyUI() {
@@ -1081,16 +1127,22 @@
         async function handleImageUpload(file, formType) {
             const hiddenInputId = (formType === 'add') ? 'hidden-pasted-image-url' : 'hidden-edit-pasted-image-url';
             const previewContainerId = (formType === 'add') ? 'pasted-image-preview-container' : 'edit-pasted-image-preview-container';
-            const uploadWrapperId = (formType === 'add') ? 'pasted-image-upload-wrapper' : 'edit-pasted-image-upload-wrapper';
-
+            
             const hiddenInput = document.getElementById(hiddenInputId);
             const previewContainer = document.getElementById(previewContainerId);
-            const uploadWrapper = document.getElementById(uploadWrapperId);
-            
-            const pasteBox = uploadWrapper.querySelector('.file-upload-label');
-            const originalText = pasteBox.querySelector('span').textContent;
-            pasteBox.querySelector('span').textContent = 'Uploading...';
-            uploadWrapper.style.pointerEvents = 'none';
+
+            const uploadContainerId = (formType === 'add') ? 'add-image-upload-container' : 'edit-image-upload-container';
+            const pasteContainerId = (formType === 'add') ? 'add-image-paste-container' : 'edit-image-paste-container';
+            const sourceSelectorId = (formType === 'add') ? 'add-image-source-selector' : 'edit-image-source-selector';
+
+            const uploadContainer = document.getElementById(uploadContainerId);
+            const pasteContainer = document.getElementById(pasteContainerId);
+            const sourceSelector = document.getElementById(sourceSelectorId);
+
+            const activeContainer = uploadContainer.style.display !== 'none' ? uploadContainer : pasteContainer;
+            const labelSpan = activeContainer.querySelector('span');
+            const originalText = labelSpan ? labelSpan.textContent : '';
+            if(labelSpan) labelSpan.textContent = 'Uploading...';
             
             try {
                 const storageRef = fb.ref(storage, `pasted_images/${Date.now()}_${file.name}`);
@@ -1113,36 +1165,14 @@
                 previewContainer.innerHTML = `<img src="${downloadURL}" alt="Pasted preview" style="max-width: 100%; max-height: 150px; border-radius: 5px;">
                                               <button type="button" onclick="clearPastedImage(true, '${formType}')" class="remove-file-btn" style="display:inline-block; margin-left: 10px;">&times;</button>`;
                 previewContainer.style.display = 'block';
-                uploadWrapper.style.display = 'none';
-                
+                sourceSelector.style.display = 'none';
+                uploadContainer.style.display = 'none';
+                pasteContainer.style.display = 'none';
+
             } catch (error) {
                 console.error("Image upload failed:", error);
                 alert("Failed to upload image. Please try again.");
-                pasteBox.querySelector('span').textContent = originalText;
-            } finally {
-                uploadWrapper.style.pointerEvents = 'auto';
-            }
-        }
-
-        function isMobileDevice() {
-            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        }
-
-        function setupImageInputs() {
-            const isMobile = isMobileDevice();
-            const addPasteBox = document.getElementById('paste-image-box');
-            const editPasteBox = document.getElementById('edit-paste-image-box');
-            
-            if (isMobile) {
-                addPasteBox.contentEditable = false;
-                addPasteBox.querySelector('span').textContent = '🎨 Click to Upload Image';
-                editPasteBox.contentEditable = false;
-                editPasteBox.querySelector('span').textContent = '🎨 Click to Upload Image';
-            } else {
-                addPasteBox.contentEditable = true;
-                addPasteBox.querySelector('span').textContent = '🎨 Click to Upload or Paste Image';
-                editPasteBox.contentEditable = true;
-                editPasteBox.querySelector('span').textContent = '🎨 Click to Upload or Paste Image';
+                if(labelSpan) labelSpan.textContent = originalText;
             }
         }
 
@@ -1155,8 +1185,6 @@
             flatpickr("#salary-month", { ...monthPickerConfig, onChange: (selectedDates, dateStr) => updateSalaryInputForMonth(dateStr) });
             flatpickr("#budget-month", { ...monthPickerConfig, onChange: () => displayBudgets() });
             
-            setupImageInputs();
-
             document.getElementById('receipt').addEventListener('change', async function() {
                 if (this.files.length === 0) return;
                 const file = this.files[0];
@@ -1218,6 +1246,22 @@
             
             document.getElementById('category').addEventListener('change', updateAddExpenseBudgetInfo);
             
+            document.querySelectorAll('input[name="image-source"]').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    const isUpload = this.value === 'upload';
+                    document.getElementById('add-image-upload-container').style.display = isUpload ? 'block' : 'none';
+                    document.getElementById('add-image-paste-container').style.display = isUpload ? 'none' : 'block';
+                });
+            });
+            
+            document.querySelectorAll('input[name="edit-image-source"]').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    const isUpload = this.value === 'upload';
+                    document.getElementById('edit-image-upload-container').style.display = isUpload ? 'block' : 'none';
+                    document.getElementById('edit-image-paste-container').style.display = isUpload ? 'none' : 'block';
+                });
+            });
+
             document.getElementById('paste-image-box').addEventListener('paste', (e) => {
                 const items = (e.clipboardData || window.clipboardData).items;
                 for (const item of items) {
