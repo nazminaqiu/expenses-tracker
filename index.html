@@ -64,6 +64,7 @@
         .file-upload input[type=file] { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
         .file-upload-label { display: block; flex-grow: 1; padding: 12px; border: 2px dashed #667eea; border-radius: 10px; text-align: center; color: #667eea; font-weight: 600; transition: all 0.3s ease; }
         .file-upload-label[contenteditable]:focus { outline: none; }
+        .file-upload-label[contenteditable]:empty::before { content: '📋 Paste Image Here'; color: #667eea; }
         .file-upload:hover .file-upload-label { background: rgba(102, 126, 234, 0.05); border-color: #764ba2; }
         #file-label-selected { color: #2c3e50; font-weight: normal; font-style: italic; }
         .remove-file-btn { background: #e74c3c; color: white; border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 18px; line-height: 28px; cursor: pointer; margin-left: -40px; z-index: 2; transition: all 0.2s ease; }
@@ -143,13 +144,6 @@
         .btn-small { padding: 10px 15px; font-size: 14px; }
         #receipt-preview-container { margin-top: 15px; text-align: center; }
         #receipt-preview-container img { max-width: 100%; max-height: 200px; border-radius: 10px; border: 2px solid #e1e8ed; }
-        
-        [contenteditable="true"].file-upload-label:empty::before {
-            content: '📋 Paste Image Here';
-            color: #8898aa;
-            font-weight: 600;
-            pointer-events: none;
-        }
 
         @media (max-width: 768px) {
             .container { padding: 0 10px; }
@@ -222,6 +216,7 @@
                                     <div id="paste-image-box" class="file-upload-label" contenteditable="true"></div>
                                  </div>
                             </div>
+                            <div class="progress-bar-container" id="add-image-progress-container"><div class="progress-bar" id="add-image-progress-bar"></div></div>
                             <input type="hidden" id="hidden-pasted-image-url">
                             <div id="pasted-image-preview-container" style="display:none; margin-top: 10px; text-align: center;"></div>
                         </div>
@@ -415,6 +410,7 @@
                                 <div id="edit-paste-image-box" class="file-upload-label" contenteditable="true"></div>
                              </div>
                         </div>
+                        <div class="progress-bar-container" id="edit-image-progress-container"><div class="progress-bar" id="edit-image-progress-bar"></div></div>
                         <div id="edit-pasted-image-preview-container" style="display:none; margin-top: 10px; text-align: center;"></div>
                     </div>
 
@@ -470,9 +466,16 @@
             }
         }
 
-        async function deleteFromDB(collectionName, id) {
+        async function deleteFromDB(event, collectionName, id) {
             if (isViewOnlyMode) return;
             if (!confirm(`Are you sure you want to delete this ${collectionName.slice(0, -1)}?`)) return;
+
+            const button = event.target;
+            button.disabled = true;
+            const originalText = button.textContent;
+            button.textContent = 'Deleting...';
+            const editButton = button.closest('.expense-actions')?.querySelector('.btn');
+            if (editButton) editButton.disabled = true;
 
             const docRef = fb.doc(db, collectionName, id);
 
@@ -481,16 +484,8 @@
                     const docSnap = await fb.getDoc(docRef);
                     if (docSnap.exists()) {
                         const expenseData = docSnap.data();
-
-                        // Delete main receipt
-                        if (expenseData.receipt) {
-                            await fb.deleteObject(fb.ref(storage, expenseData.receipt));
-                        }
-                        
-                        // Delete pasted image
-                        if (expenseData.pastedImage) {
-                           await fb.deleteObject(fb.ref(storage, expenseData.pastedImage));
-                        }
+                        if (expenseData.receipt) await fb.deleteObject(fb.ref(storage, expenseData.receipt));
+                        if (expenseData.pastedImage) await fb.deleteObject(fb.ref(storage, expenseData.pastedImage));
                     }
                 } catch (error) {
                     console.error("Error deleting associated files from Storage:", error);
@@ -501,6 +496,9 @@
                 await fb.deleteDoc(docRef);
             } catch (error) {
                 console.error(`Error deleting document from ${collectionName}:`, error);
+                button.disabled = false;
+                button.textContent = originalText;
+                if (editButton) editButton.disabled = false;
             }
         }
         
@@ -577,8 +575,8 @@
             
             if (success) { 
                 this.reset(); 
-                clearFileInput(false);
-                clearPastedImage(false, 'add');
+                clearFileInput(null, false);
+                clearPastedImage(null, false, 'add');
                 flatpickr("#date").setDate("today"); 
                 alert('Expense added!'); 
                 document.querySelectorAll('.tab[data-tab-name="view"]')[0].click(); 
@@ -616,18 +614,27 @@
             try { await fb.updateDoc(fb.doc(db, "categories", id), updatedData); alert("Category updated!"); hideEditModal(); } catch (error) { console.error("Error updating category:", error); alert("Failed to update category."); }
         });
         
-        async function clearFileInput(deleteFromStorage = true) {
+        async function clearFileInput(event, deleteFromStorage = true) {
+            const button = event ? event.target : null;
             const hiddenUrlInput = document.getElementById('hidden-receipt-url');
             const fileUrl = hiddenUrlInput.value;
 
             if (deleteFromStorage && fileUrl) {
                 if (!confirm("Are you sure you want to remove this receipt? It will be deleted permanently.")) return;
+                if(button) {
+                    button.disabled = true;
+                    button.innerHTML = '&#8635;'; // Spinner
+                }
                 try {
-                    const fileRef = fb.ref(storage, fileUrl);
-                    await fb.deleteObject(fileRef);
+                    await fb.deleteObject(fb.ref(storage, fileUrl));
                 } catch (error) {
                     console.error("Error deleting file from Storage:", error);
                     alert("Could not delete the file. Please try again.");
+                    if(button) {
+                       button.disabled = false;
+                       button.innerHTML = '&times;';
+                    }
+                    return;
                 }
             }
             
@@ -639,40 +646,44 @@
             previewContainer.style.display = 'none';
         }
         
-        async function clearPastedImage(deleteFromStorage = true, formType = 'add') {
+        async function clearPastedImage(event, deleteFromStorage = true, formType = 'add') {
             const hiddenInputId = (formType === 'add') ? 'hidden-pasted-image-url' : 'hidden-edit-pasted-image-url';
             const previewContainerId = (formType === 'add') ? 'pasted-image-preview-container' : 'edit-pasted-image-preview-container';
             
-            const hiddenUrlInput = document.getElementById(hiddenInputId);
-            const fileUrl = hiddenUrlInput.value;
-            
-            if (deleteFromStorage && fileUrl) {
-                 if (!confirm("Are you sure you want to remove this pasted image?")) return;
-                try {
-                    await fb.deleteObject(fb.ref(storage, fileUrl));
-                } catch (error) {
-                    console.error("Error deleting pasted image from Storage:", error);
-                    alert("Could not delete the pasted image. Please try again.");
-                    return;
+            if (deleteFromStorage) {
+                if (!confirm("Are you sure you want to remove this pasted image?")) return;
+                const button = event.target;
+                button.disabled = true;
+                button.innerHTML = '&#8635;'; // Spinner
+
+                const hiddenUrlInput = document.getElementById(hiddenInputId);
+                const fileUrl = hiddenUrlInput.value;
+                if (fileUrl) {
+                    try {
+                        await fb.deleteObject(fb.ref(storage, fileUrl));
+                    } catch (error) {
+                        console.error("Error deleting pasted image from Storage:", error);
+                        alert("Could not delete the pasted image. Please try again.");
+                        button.disabled = false;
+                        button.innerHTML = '&times;';
+                        return;
+                    }
                 }
             }
-            
-            hiddenUrlInput.value = '';
+
+            document.getElementById(hiddenInputId).value = '';
             const previewContainer = document.getElementById(previewContainerId);
             previewContainer.innerHTML = '';
             previewContainer.style.display = 'none';
             
-            if (formType === 'add') {
-                document.getElementById('add-image-source-selector').style.display = 'block';
-                document.querySelector('input[name="image-source"][value="upload"]').checked = true;
-                document.getElementById('add-image-upload-container').style.display = 'block';
-                document.getElementById('add-image-paste-container').style.display = 'none';
-            } else { // formType === 'edit'
-                document.getElementById('edit-image-source-selector').style.display = 'block';
-                document.querySelector('input[name="edit-image-source"][value="upload"]').checked = true;
-                document.getElementById('edit-image-upload-container').style.display = 'block';
-                document.getElementById('edit-image-paste-container').style.display = 'none';
-            }
+            const sourceSelectorId = (formType === 'add') ? 'add-image-source-selector' : 'edit-image-source-selector';
+            const uploadContainerId = (formType === 'add') ? 'add-image-upload-container' : 'edit-image-upload-container';
+            const pasteContainerId = (formType === 'add') ? 'add-image-paste-container' : 'edit-image-paste-container';
+
+            document.getElementById(sourceSelectorId).style.display = 'block';
+            document.querySelector(`input[name="${formType === 'add' ? 'image-source' : 'edit-image-source'}"][value="upload"]`).checked = true;
+            document.getElementById(uploadContainerId).style.display = 'block';
+            document.getElementById(pasteContainerId).style.display = 'none';
         }
 
 
@@ -706,7 +717,7 @@
                 const actionButtons = isViewOnlyMode ? '' : `
                     <div class="expense-actions" style="margin-top: 15px; display: flex; gap: 10px;">
                         <button class="btn" style="padding: 8px 12px; font-size: 14px; background: #ffc107;" onclick="showEditExpenseModal('${exp.id}')">Edit</button>
-                        <button class="delete-btn" style="margin-top: 0;" onclick="deleteFromDB('expenses', '${exp.id}')">Delete</button>
+                        <button class="delete-btn" style="margin-top: 0;" onclick="deleteFromDB(event, 'expenses', '${exp.id}')">Delete</button>
                     </div>`;
                 return `
                 <div class="expense-item">
@@ -729,7 +740,7 @@
             list.innerHTML += allCategories.map(cat => {
                 const actionButtons = isViewOnlyMode ? '' : `
                     <button class="btn" style="padding: 8px 16px; margin-top: 0; background: #ffc107;" onclick="showEditModal('${cat.id}', '${cat.name}', '${cat.icon}')">Edit</button>
-                    <button class="delete-btn" style="margin-top: 0;" onclick="deleteFromDB('categories', '${cat.id}')">Delete</button>`;
+                    <button class="delete-btn" style="margin-top: 0;" onclick="deleteFromDB(event, 'categories', '${cat.id}')">Delete</button>`;
                 return `
                 <div class="expense-item custom-category-item" style="display: flex; justify-content: space-between; align-items: center;">
                     <div><span style="font-size: 24px; margin-right: 15px;">${cat.icon}</span><span style="font-weight: 600;">${cat.name}</span></div>
@@ -1011,13 +1022,13 @@
             if (expense.pastedImage) {
                 const previewContainer = document.getElementById('edit-pasted-image-preview-container');
                 previewContainer.innerHTML = `<img src="${expense.pastedImage}" alt="Pasted preview" style="max-width: 100%; max-height: 150px; border-radius: 5px;">
-                                              <button type="button" onclick="clearPastedImage(true, 'edit')" class="remove-file-btn" style="display:inline-block; margin-left: 10px;">&times;</button>`;
+                                              <button type="button" onclick="clearPastedImage(event, true, 'edit')" class="remove-file-btn" style="display:inline-block; margin-left: 10px;">&times;</button>`;
                 previewContainer.style.display = 'block';
                 document.getElementById('edit-image-source-selector').style.display = 'none';
                 document.getElementById('edit-image-upload-container').style.display = 'none';
                 document.getElementById('edit-image-paste-container').style.display = 'none';
             } else {
-                clearPastedImage(false, 'edit');
+                clearPastedImage(null, false, 'edit');
             }
 
             const categorySelect = document.getElementById('edit-category');
@@ -1117,12 +1128,20 @@
             if (!expenseId) return;
             if (confirm("Are you sure you want to remove the receipt? This cannot be undone.")) {
                 const originalExpense = allExpenses.find(exp => exp.id === expenseId);
+                const button = this;
                 if (originalExpense && originalExpense.receipt) {
+                    button.disabled = true;
+                    const originalText = button.textContent;
+                    button.textContent = 'Removing...';
                     try {
                         await fb.deleteObject(fb.ref(storage, originalExpense.receipt));
                         await fb.updateDoc(fb.doc(db, "expenses", expenseId), { receipt: null });
                         alert("Receipt removed."); document.getElementById('existing-receipt-container').style.display = 'none';
-                    } catch (error) { console.error("Error removing receipt:", error); alert("Failed to remove receipt."); }
+                    } catch (error) { console.error("Error removing receipt:", error); alert("Failed to remove receipt."); 
+                    } finally {
+                        button.disabled = false;
+                        button.textContent = originalText;
+                    }
                 }
             }
         });
@@ -1130,52 +1149,51 @@
         async function handleImageUpload(file, formType) {
             const hiddenInputId = (formType === 'add') ? 'hidden-pasted-image-url' : 'hidden-edit-pasted-image-url';
             const previewContainerId = (formType === 'add') ? 'pasted-image-preview-container' : 'edit-pasted-image-preview-container';
+            const progressContainerId = (formType === 'add') ? 'add-image-progress-container' : 'edit-image-progress-container';
+            const progressBarId = (formType === 'add') ? 'add-image-progress-bar' : 'edit-image-progress-bar';
             
             const hiddenInput = document.getElementById(hiddenInputId);
             const previewContainer = document.getElementById(previewContainerId);
+            const progressContainer = document.getElementById(progressContainerId);
+            const progressBar = document.getElementById(progressBarId);
 
             const uploadContainerId = (formType === 'add') ? 'add-image-upload-container' : 'edit-image-upload-container';
             const pasteContainerId = (formType === 'add') ? 'add-image-paste-container' : 'edit-image-paste-container';
             const sourceSelectorId = (formType === 'add') ? 'add-image-source-selector' : 'edit-image-source-selector';
-
-            const uploadContainer = document.getElementById(uploadContainerId);
-            const pasteContainer = document.getElementById(pasteContainerId);
-            const sourceSelector = document.getElementById(sourceSelectorId);
-
-            const activeContainer = uploadContainer.style.display !== 'none' ? uploadContainer : pasteContainer;
-            const labelSpan = activeContainer.querySelector('span');
-            const originalText = labelSpan ? labelSpan.textContent : '';
-            if(labelSpan) labelSpan.textContent = 'Uploading...';
+            
+            document.getElementById(sourceSelectorId).style.display = 'none';
+            document.getElementById(uploadContainerId).style.display = 'none';
+            document.getElementById(pasteContainerId).style.display = 'none';
+            
+            progressContainer.style.display = 'block';
+            progressBar.style.width = '0%';
             
             try {
                 const storageRef = fb.ref(storage, `pasted_images/${Date.now()}_${file.name}`);
                 const uploadTask = fb.uploadBytesResumable(storageRef, file);
                 const downloadURL = await new Promise((resolve, reject) => {
-                    uploadTask.on('state_changed', null, 
+                    uploadTask.on('state_changed', 
+                        (snapshot) => { progressBar.style.width = `${(snapshot.bytesTransferred / snapshot.totalBytes) * 100}%`; },
                         (error) => reject(error), 
-                        async () => {
-                            const url = await fb.getDownloadURL(uploadTask.snapshot.ref);
-                            resolve(url);
-                        }
+                        async () => { const url = await fb.getDownloadURL(uploadTask.snapshot.ref); resolve(url); }
                     );
                 });
                 
                 hiddenInput.value = downloadURL;
-                if (formType === 'edit') {
-                    tempPastedImageUrl = downloadURL;
-                }
+                if (formType === 'edit') tempPastedImageUrl = downloadURL;
 
                 previewContainer.innerHTML = `<img src="${downloadURL}" alt="Pasted preview" style="max-width: 100%; max-height: 150px; border-radius: 5px;">
-                                              <button type="button" onclick="clearPastedImage(true, '${formType}')" class="remove-file-btn" style="display:inline-block; margin-left: 10px;">&times;</button>`;
+                                              <button type="button" onclick="clearPastedImage(event, true, '${formType}')" class="remove-file-btn" style="display:inline-block; margin-left: 10px;">&times;</button>`;
                 previewContainer.style.display = 'block';
-                sourceSelector.style.display = 'none';
-                uploadContainer.style.display = 'none';
-                pasteContainer.style.display = 'none';
 
             } catch (error) {
                 console.error("Image upload failed:", error);
                 alert("Failed to upload image. Please try again.");
-                if(labelSpan) labelSpan.textContent = originalText;
+                document.getElementById(sourceSelectorId).style.display = 'block';
+                document.getElementById(uploadContainerId).style.display = 'block';
+            } finally {
+                progressContainer.style.display = 'none';
+                progressBar.style.width = '0%';
             }
         }
 
@@ -1211,7 +1229,7 @@
                     (error) => {
                         console.error("Upload failed:", error);
                         alert("File upload failed. Please try again.");
-                        clearFileInput(false);
+                        clearFileInput(null, false);
                     }, 
                     async () => {
                         const downloadURL = await fb.getDownloadURL(uploadTask.snapshot.ref);
@@ -1225,7 +1243,7 @@
                         } else {
                             previewContent = `<a href="${downloadURL}" target="_blank" class="receipt-link" style="margin-top: 0;">View Uploaded File</a>`;
                         }
-                        previewContent += `<button type="button" onclick="clearFileInput(true)" class="remove-file-btn" style="display:inline-block; margin-left: 10px;">&times;</button>`;
+                        previewContent += `<button type="button" onclick="clearFileInput(event, true)" class="remove-file-btn" style="display:inline-block; margin-left: 10px;">&times;</button>`;
                         
                         previewContainer.innerHTML = previewContent;
                         previewContainer.style.display = 'block';
