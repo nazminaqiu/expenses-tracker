@@ -1070,45 +1070,77 @@
         document.getElementById('edit-expense-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             if (isViewOnlyMode) return;
+
             const submitBtn = this.querySelector('button[type="submit"]');
-            submitBtn.disabled = true; submitBtn.textContent = 'Saving...';
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
+
             const expenseId = document.getElementById('edit-expense-id').value;
             const originalExpense = allExpenses.find(exp => exp.id === expenseId);
+            
             let newReceiptURL = originalExpense.receipt;
+            let receiptUrlToDelete = null;
+
             const fileInput = document.getElementById('edit-receipt');
-            if (fileInput.files[0]) {
-                if (originalExpense.receipt) {
-                    try { await fb.deleteObject(fb.ref(storage, originalExpense.receipt)); } catch (error) { console.error("Could not delete the old receipt file.", error); }
-                }
-                const file = fileInput.files[0];
-                const storageRef = fb.ref(storage, `receipts/${Date.now()}_${file.name}`);
-                const uploadTask = fb.uploadBytesResumable(storageRef, file);
-                const progressContainer = document.getElementById('edit-progress-container');
-                const progressBar = document.getElementById('edit-progress-bar');
-                progressContainer.style.display = 'block';
-                await new Promise((resolve, reject) => {
-                    uploadTask.on('state_changed', (snapshot) => { progressBar.style.width = `${(snapshot.bytesTransferred / snapshot.totalBytes) * 100}%`; }, (error) => { console.error("Upload failed:", error); reject(error); }, async () => { newReceiptURL = await fb.getDownloadURL(uploadTask.snapshot.ref); resolve(); });
-                });
-            }
-            const updatedData = { 
-                date: document.getElementById('edit-date').value, 
-                category: document.getElementById('edit-category').value, 
-                amount: parseFloat(document.getElementById('edit-amount').value), 
-                description: document.getElementById('edit-description').value, 
-                receipt: newReceiptURL,
-                pastedImage: document.getElementById('hidden-edit-pasted-image-url').value || null
-            };
+            
             try {
+                if (fileInput.files[0]) {
+                    if (originalExpense.receipt) {
+                        receiptUrlToDelete = originalExpense.receipt;
+                    }
+                    const file = fileInput.files[0];
+                    const storageRef = fb.ref(storage, `receipts/${Date.now()}_${file.name}`);
+                    const uploadTask = fb.uploadBytesResumable(storageRef, file);
+                    const progressContainer = document.getElementById('edit-progress-container');
+                    const progressBar = document.getElementById('edit-progress-bar');
+                    progressContainer.style.display = 'block';
+
+                    newReceiptURL = await new Promise((resolve, reject) => {
+                        uploadTask.on('state_changed', 
+                            (snapshot) => { progressBar.style.width = `${(snapshot.bytesTransferred / snapshot.totalBytes) * 100}%`; }, 
+                            (error) => { console.error("Upload failed:", error); reject(error); }, 
+                            async () => { const url = await fb.getDownloadURL(uploadTask.snapshot.ref); resolve(url); }
+                        );
+                    });
+                }
+                
+                const updatedData = { 
+                    date: document.getElementById('edit-date').value, 
+                    category: document.getElementById('edit-category').value, 
+                    amount: parseFloat(document.getElementById('edit-amount').value), 
+                    description: document.getElementById('edit-description').value, 
+                    receipt: newReceiptURL,
+                    pastedImage: document.getElementById('hidden-edit-pasted-image-url').value || null
+                };
+
                 await fb.updateDoc(fb.doc(db, "expenses", expenseId), updatedData);
+                
+                if (receiptUrlToDelete) {
+                    await fb.deleteObject(fb.ref(storage, receiptUrlToDelete));
+                }
+
+                if (originalExpense.pastedImage && originalExpense.pastedImage !== updatedData.pastedImage) {
+                     await fb.deleteObject(fb.ref(storage, originalExpense.pastedImage));
+                }
+
                 tempPastedImageUrl = null;
-                alert("Expense updated successfully!"); hideEditExpenseModal();
-            } catch (error) { console.error("Error updating expense:", error); alert("Failed to update expense.");
+                alert("Expense updated successfully!");
+                hideEditExpenseModal();
+
+            } catch (error) {
+                console.error("Error updating expense:", error);
+                alert("Failed to update expense.");
             } finally {
-                submitBtn.disabled = false; submitBtn.textContent = 'Save Changes';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save Changes';
                 const progressContainer = document.getElementById('edit-progress-container');
-                if(progressContainer) { progressContainer.style.display = 'none'; document.getElementById('edit-progress-bar').style.width = '0%'; }
+                if(progressContainer) { 
+                    progressContainer.style.display = 'none';
+                    document.getElementById('edit-progress-bar').style.width = '0%'; 
+                }
             }
         });
+
 
         document.getElementById('edit-receipt').addEventListener('change', function() {
             const file = this.files[0];
