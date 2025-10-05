@@ -175,9 +175,10 @@
                 <button class="tab active" data-tab-name="add" onclick="switchTab(event, 'add')">Add Expense</button>
                 <button class="tab" data-tab-name="view" onclick="switchTab(event, 'view')">View Expenses</button>
                 <button class="tab" data-tab-name="summary" onclick="switchTab(event, 'summary')">Summary</button>
+                <button class="tab" data-tab-name="income" onclick="switchTab(event, 'income')">Income</button>
+                <button class="tab" data-tab-name="owed" onclick="switchTab(event, 'owed')">Owed Money</button>
                 <button class="tab" data-tab-name="budget" onclick="switchTab(event, 'budget')">Budget</button>
                 <button class="tab" data-tab-name="categories" onclick="switchTab(event, 'categories')">Categories</button>
-                <button class="tab" data-tab-name="owed" onclick="switchTab(event, 'owed')">Owed Money</button>
             </div>
             <div class="content">
                 <div id="add-tab" class="tab-content active">
@@ -263,11 +264,12 @@
                     <h2 id="summary-month-header" style="text-align: center; margin-bottom: 25px; color: #2c3e50;"></h2>
                     <div class="summary-cards">
                         <div class="summary-card" title="Your salary for the current month."><h3>Your Salary</h3><div class="amount" id="month-salary">RM 0.00</div></div>
-                        <div class="summary-card" title="Total expenses paid by you and your wife this month."><h3>Total Household Expenses</h3><div class="amount" id="month-amount">RM 0.00</div></div>
-                        <div class="summary-card" title="Your Salary - Your Spending."><h3>Remaining from Salary</h3><div class="amount" id="remaining-balance">RM 0.00</div></div>
-                        <div class="summary-card" title="Total of active debts owed to you."><h3>Money Owed to You</h3><div class="amount" id="owed-to-me">RM 0.00</div></div>
+                        <div class="summary-card" title="Repayments and other income received this month."><h3>Other Income</h3><div class="amount" id="month-income">RM 0.00</div></div>
+                        <div class="summary-card" title="(Salary + Other Income) - Your Spending."><h3>Your Remaining Balance</h3><div class="amount" id="remaining-balance">RM 0.00</div></div>
+                        <div class="summary-card" title="Total expenses paid by you and your wife this month."><h3>Household Expenses</h3><div class="amount" id="month-amount">RM 0.00</div></div>
                         <div class="summary-card" title="Expenses paid only by you this month."><h3>Your Spending</h3><div class="amount" id="my-spending">RM 0.00</div></div>
                         <div class="summary-card" title="Expenses paid only by your wife this month."><h3>Wife's Spending</h3><div class="amount" id="wife-spending">RM 0.00</div></div>
+                        <div class="summary-card" title="Total of active debts owed to you."><h3>Money Owed to You</h3><div class="amount" id="owed-to-me">RM 0.00</div></div>
                     </div>
                     <div id="salary-section" class="expenses-list" style="margin-bottom: 30px;">
                         <h3 style="margin-bottom: 20px; color: #2c3e50;">Manage Your Salary</h3>
@@ -278,6 +280,7 @@
                         </form>
                     </div>
                 </div>
+                <div id="income-tab" class="tab-content"><div class="expenses-list" id="income-list"></div></div>
                 <div id="budget-tab" class="tab-content">
                     <div class="form-group"><label for="budget-month">Select month to view/edit budget</label><input type="text" id="budget-month" required></div>
                     <div class="summary-cards" style="margin-top:30px; margin-bottom: 30px;">
@@ -326,6 +329,7 @@
         let allSalaries = {};
         let allBudgets = {};
         let allOwedMoney = [];
+        let allIncome = [];
         let isInitialExpenseLoad = true;
         let tempPastedImageUrl = null; 
         const presetIcons = [ '🏡', '💡', '💧', '🌐', '🛋️', '📺', '🚗', '⛽', '🛣️', '🅿️', '🔧', '📱', '🎬', '🎵', '🧸', '🍼', '🛒', '🧽', '💳', '📦', '🍴', '🛵', '🎮', '🎥', '⚽', '🎸', '🏥', '💊', '🏋️', '💰', '📈', '📶', '👨‍👩‍👦' ];
@@ -392,6 +396,15 @@
             fb.onSnapshot(q, (snapshot) => {
                 allOwedMoney = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 displayOwedMoney();
+                updateSummary();
+            });
+        }
+
+        function listenForIncome() {
+             const q = fb.query(fb.collection(db, "income"), fb.orderBy("date", "desc"));
+            fb.onSnapshot(q, (snapshot) => {
+                allIncome = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                displayIncome();
                 updateSummary();
             });
         }
@@ -494,18 +507,27 @@
 
         document.getElementById('owed-form').addEventListener('submit', async function(e) {
             e.preventDefault();
-            const owedEntry = {
-                person: document.getElementById('owed-person').value,
-                amount: parseFloat(document.getElementById('owed-amount').value),
-                description: document.getElementById('owed-description').value,
-                date: new Date().toISOString().split('T')[0],
-                status: 'Owed',
-                timestamp: new Date().toISOString()
-            };
-
-            if (await fb.addDoc(fb.collection(db, "owedMoney"), owedEntry)) {
+            const submitBtn = this.querySelector('button[type="submit"]');
+            submitBtn.disabled = true; submitBtn.textContent = 'Saving...';
+            
+            const today = new Date().toISOString().split('T')[0];
+            const person = document.getElementById('owed-person').value;
+            const amount = parseFloat(document.getElementById('owed-amount').value);
+            const description = document.getElementById('owed-description').value;
+            
+            const owedEntry = { person, amount, description, date: today, status: 'Owed', timestamp: new Date().toISOString() };
+            const expenseEntry = { date: today, category: 'Money Lent', amount, description: `Loan to ${person}: ${description}`, paidBy: 'Me', timestamp: new Date().toISOString() };
+            
+            try {
+                await fb.addDoc(fb.collection(db, "owedMoney"), owedEntry);
+                await fb.addDoc(fb.collection(db, "expenses"), expenseEntry);
                 this.reset();
-                alert('Owed entry added!');
+                alert('Owed entry and corresponding expense have been added!');
+            } catch(error) {
+                 alert('Failed to add entry. Please try again.');
+                 console.error("Error creating owed entry/expense:", error);
+            } finally {
+                submitBtn.disabled = false; submitBtn.textContent = 'Add Owed Entry';
             }
         });
 
@@ -618,6 +640,7 @@
             displayCategories();
             displayBudgets();
             displayOwedMoney();
+            displayIncome();
         }
 
         function displayExpenses(filtered = null) {
@@ -629,7 +652,7 @@
             }
             list.innerHTML = expensesToShow.map(exp => {
                 const category = allCategories.find(c => c.name === exp.category);
-                const icon = category ? category.icon : '📌';
+                const icon = category ? category.icon : (exp.category === 'Money Lent' ? '💸' : '📌');
                 
                 let descriptionHTML = exp.description || '';
                 if(exp.pastedImage) {
@@ -667,7 +690,7 @@
             }
             
             const actionButtons = (itemId) => isViewOnlyMode ? '' : `
-                <button class="btn" style="padding: 8px 12px; font-size: 14px; background: #ffc107; margin-right: 10px;" onclick="showEditOwedModal('${itemId}')">Edit</button>
+                <button class="btn" style="padding: 8px 12px; font-size: 14px; background: #ffc107;" onclick="showEditOwedModal('${itemId}')">Edit</button>
                 <button class="delete-btn" style="margin-top: 0;" onclick="deleteFromDB(event, 'owedMoney', '${itemId}')">Delete</button>
             `;
 
@@ -681,21 +704,48 @@
                         <div class="expense-amount">RM ${item.amount.toFixed(2)}</div>
                     </div>
                     <div class="expense-date">Recorded: ${formatDate(item.date)}</div>
-                    <div style="margin-top: 15px; display: flex; gap: 10px;">
-                        <button class="btn" style="padding: 8px 12px; font-size: 14px; background: #28a745;" onclick="markOwedAsPaid(event, '${item.id}')">Mark as Paid</button>
-                        ${actionButtons(item.id)}
+                    <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
+                        <button class="btn" style="padding: 8px 12px; font-size: 14px; background: #28a745;" onclick="markOwedAsPaid(event, '${item.id}', '${item.person}', ${item.amount})">Mark as Paid</button>
+                        <div class="expense-actions" style="display: flex; gap: 10px;">${actionButtons(item.id)}</div>
                     </div>
                 </div>
             `).join('');
         }
 
-        async function markOwedAsPaid(event, id) {
+         function displayIncome() {
+            const list = document.getElementById('income-list');
+             if (allIncome.length === 0) {
+                list.innerHTML = `<h3 style="margin-bottom: 20px; color: #2c3e50;">Other Income</h3><div class="no-expenses"><div class="no-expenses-icon">📥</div><p>No other income recorded.</p></div>`;
+                return;
+            }
+            list.innerHTML = `<h3 style="margin-bottom: 20px; color: #2c3e50;">Other Income</h3>` + allIncome.map(item => `
+                 <div class="expense-item">
+                    <div class="expense-header">
+                         <div><span class="expense-category" style="background: #28a745; color: white;">${item.type}</span></div>
+                        <div class="expense-amount" style="color: #28a745;">+ RM ${item.amount.toFixed(2)}</div>
+                    </div>
+                    <div class="expense-details">${item.description}</div>
+                    <div class="expense-date">📅 ${formatDate(item.date)}</div>
+                </div>
+            `).join('');
+        }
+
+        async function markOwedAsPaid(event, id, person, amount) {
             if (isViewOnlyMode) return;
             const button = event.target;
             button.disabled = true;
             button.textContent = 'Updating...';
             try {
                 await fb.updateDoc(fb.doc(db, "owedMoney", id), { status: 'Paid' });
+                const incomeEntry = {
+                    date: new Date().toISOString().split('T')[0],
+                    amount: amount,
+                    type: 'Repayment',
+                    description: `From ${person}`,
+                    timestamp: new Date().toISOString()
+                };
+                await fb.addDoc(fb.collection(db, "income"), incomeEntry);
+                alert(`${person}'s debt has been marked as paid and added to your income.`);
             } catch (error) {
                 console.error("Error updating owed status:", error);
                 alert("Failed to update status.");
@@ -725,13 +775,15 @@
             const now = new Date();
             const currentMonthStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
             const monthExpenses = allExpenses.filter(exp => exp.date.startsWith(currentMonthStr));
+            const monthIncome = allIncome.filter(inc => inc.date.startsWith(currentMonthStr));
             
             const totalMonthExpenses = monthExpenses.reduce((sum, exp) => sum + exp.amount, 0);
             const mySpending = monthExpenses.filter(e => e.paidBy === 'Me').reduce((sum, exp) => sum + exp.amount, 0);
             const wifeSpending = monthExpenses.filter(e => e.paidBy === 'Wife').reduce((sum, exp) => sum + exp.amount, 0);
-            
+            const totalMonthIncome = monthIncome.reduce((sum, inc) => sum + inc.amount, 0);
+
             const currentMonthSalary = allSalaries[currentMonthStr] ? allSalaries[currentMonthStr].amount : 0;
-            const remainingFromSalary = currentMonthSalary - mySpending;
+            const remainingFromSalary = (currentMonthSalary + totalMonthIncome) - mySpending;
             
             const totalOwed = allOwedMoney.filter(o => o.status === 'Owed').reduce((sum, item) => sum + item.amount, 0);
 
@@ -739,6 +791,7 @@
             document.getElementById('my-spending').textContent = `RM ${mySpending.toFixed(2)}`;
             document.getElementById('wife-spending').textContent = `RM ${wifeSpending.toFixed(2)}`;
             document.getElementById('month-salary').textContent = `RM ${currentMonthSalary.toFixed(2)}`;
+            document.getElementById('month-income').textContent = `RM ${totalMonthIncome.toFixed(2)}`;
             document.getElementById('remaining-balance').textContent = `RM ${remainingFromSalary.toFixed(2)}`;
             document.getElementById('owed-to-me').textContent = `RM ${totalOwed.toFixed(2)}`;
             
@@ -1258,6 +1311,7 @@
             listenForExpenses();
             listenForBudgets();
             listenForOwedMoney();
+            listenForIncome();
             setupViewOnlyUI();
         });
     </script>
