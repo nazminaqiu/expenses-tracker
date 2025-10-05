@@ -177,6 +177,7 @@
                 <button class="tab" data-tab-name="summary" onclick="switchTab(event, 'summary')">Summary</button>
                 <button class="tab" data-tab-name="budget" onclick="switchTab(event, 'budget')">Budget</button>
                 <button class="tab" data-tab-name="categories" onclick="switchTab(event, 'categories')">Categories</button>
+                <button class="tab" data-tab-name="owed" onclick="switchTab(event, 'owed')">Owed Money</button>
             </div>
             <div class="content">
                 <div id="add-tab" class="tab-content active">
@@ -185,15 +186,18 @@
                         <div class="form-group">
                             <label for="category">Category</label>
                             <select id="category" required><option value="">Select Category</option></select>
-                            <div id="add-expense-budget-info" style="display: none; margin-top: 10px; padding: 10px; background-color: #f7f9fc; border-radius: 8px; font-size: 14px; color: #657786;">
-                                Budget for this month: <span id="budget-info-total" style="font-weight: 600;"></span> | 
-                                Spent: <span id="budget-info-spent" style="font-weight: 600;"></span> | 
-                                Remaining: <span id="budget-info-remaining" style="font-weight: 700;"></span>
-                            </div>
                         </div>
                         <div class="form-group"><label for="amount">Amount (MYR)</label><input type="number" id="amount" step="0.01" placeholder="0.00" required></div>
                         <div class="form-group"><label for="description">Description</label><textarea id="description" rows="3" placeholder="Enter expense details..."></textarea></div>
                         
+                        <div class="form-group">
+                            <label>Paid By</label>
+                            <div style="display: flex; gap: 20px; align-items: center;">
+                                <label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="paidBy" value="Me" checked> Me</label>
+                                <label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="paidBy" value="Wife"> Wife</label>
+                            </div>
+                        </div>
+
                         <div class="form-group" id="add-image-source-selector">
                             <label>Image Source (Optional)</label>
                             <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 10px;">
@@ -240,6 +244,11 @@
                     <div class="filter-section">
                         <select id="filter-month" onchange="filterExpenses()"><option value="">All Months</option></select>
                         <select id="filter-category" onchange="filterExpenses()"><option value="">All Categories</option></select>
+                        <select id="filter-paid-by" onchange="filterExpenses()">
+                            <option value="">All Payers</option>
+                            <option value="Me">Paid by Me</option>
+                            <option value="Wife">Paid by Wife</option>
+                        </select>
                         <select id="sort-expenses" onchange="filterExpenses()">
                             <option value="date-desc">Sort by Date (Newest)</option>
                             <option value="date-asc">Sort by Date (Oldest)</option>
@@ -253,190 +262,57 @@
                 <div id="summary-tab" class="tab-content">
                     <h2 id="summary-month-header" style="text-align: center; margin-bottom: 25px; color: #2c3e50;"></h2>
                     <div class="summary-cards">
-                        <div class="summary-card" title="The total salary you have entered for the current month.">
-                            <h3>This Month's Salary</h3>
-                            <div class="amount" id="month-salary">RM 0.00</div>
-                        </div>
-                        <div class="summary-card" title="The sum of all expenses you have recorded in the current month.">
-                            <h3>This Month's Expenses</h3>
-                            <div class="amount" id="month-amount">RM 0.00</div>
-                        </div>
-                        <div class="summary-card" title="Calculation: This Month's Salary - This Month's Expenses.">
-                            <h3>Remaining from Salary</h3>
-                            <div class="amount" id="remaining-balance">RM 0.00</div>
-                        </div>
-                        <div class="summary-card" title="Calculation: Total Monthly Budget - This Month's Expenses.">
-                            <h3>Budget Remaining</h3>
-                            <div class="amount" id="budget-remaining-balance">RM 0.00</div>
-                        </div>
+                        <div class="summary-card" title="Your salary for the current month."><h3>Your Salary</h3><div class="amount" id="month-salary">RM 0.00</div></div>
+                        <div class="summary-card" title="Total expenses paid by you and your wife this month."><h3>Total Household Expenses</h3><div class="amount" id="month-amount">RM 0.00</div></div>
+                        <div class="summary-card" title="Your Salary - Your Spending."><h3>Remaining from Salary</h3><div class="amount" id="remaining-balance">RM 0.00</div></div>
+                        <div class="summary-card" title="Total of active debts owed to you."><h3>Money Owed to You</h3><div class="amount" id="owed-to-me">RM 0.00</div></div>
+                        <div class="summary-card" title="Expenses paid only by you this month."><h3>Your Spending</h3><div class="amount" id="my-spending">RM 0.00</div></div>
+                        <div class="summary-card" title="Expenses paid only by your wife this month."><h3>Wife's Spending</h3><div class="amount" id="wife-spending">RM 0.00</div></div>
                     </div>
                     <div id="salary-section" class="expenses-list" style="margin-bottom: 30px;">
-                        <h3 style="margin-bottom: 20px; color: #2c3e50;">Manage Salary</h3>
+                        <h3 style="margin-bottom: 20px; color: #2c3e50;">Manage Your Salary</h3>
                         <form id="salary-form">
-                            <div class="form-group">
-                                <label for="salary-month">Select Month</label>
-                                <input type="text" id="salary-month" placeholder="Select a month..." required>
-                            </div>
-                            <div class="form-group">
-                                <label for="salary-amount">Salary Amount (MYR)</label>
-                                <input type="number" id="salary-amount" step="0.01" placeholder="0.00" required>
-                            </div>
+                            <div class="form-group"><label for="salary-month">Select Month</label><input type="text" id="salary-month" placeholder="Select a month..." required></div>
+                            <div class="form-group"><label for="salary-amount">Salary Amount (MYR)</label><input type="number" id="salary-amount" step="0.01" placeholder="0.00" required></div>
                             <button type="submit" class="btn">Save Salary</button>
                         </form>
                     </div>
-                    <div class="expenses-list" id="category-breakdown">
-                        <div class="view-toggle">
-                            <h3 id="category-breakdown-title" style="margin-bottom: 0; color: #2c3e50; flex-grow: 1;">Category Breakdown</h3>
-                            <button id="view-month-btn" class="btn view-btn active">This Month</button>
-                            <button id="view-all-btn" class="btn view-btn">All Time</button>
-                        </div>
-                        <div id="category-list"></div>
-                    </div>
                 </div>
                 <div id="budget-tab" class="tab-content">
-                    <div class="form-group">
-                        <label for="budget-month">Select month to view/edit budget</label>
-                        <input type="text" id="budget-month" required>
-                    </div>
+                    <div class="form-group"><label for="budget-month">Select month to view/edit budget</label><input type="text" id="budget-month" required></div>
                     <div class="summary-cards" style="margin-top:30px; margin-bottom: 30px;">
-                        <div class="summary-card" title="The sum of all individual category budgets for the selected month.">
-                            <h3>Total Budget</h3>
-                            <div class="amount" id="budget-total-amount">RM 0.00</div>
-                        </div>
-                        <div class="summary-card" title="The sum of all expenses recorded in the selected month.">
-                            <h3>Total Spent</h3>
-                            <div class="amount" id="budget-spent-amount">RM 0.00</div>
-                        </div>
-                        <div class="summary-card" title="Calculation: Total Budget - Total Spent for the selected month.">
-                            <h3>Overall Remaining</h3>
-                            <div class="amount" id="budget-overall-remaining">RM 0.00</div>
-                        </div>
+                        <div class="summary-card" title="The sum of all individual category budgets for the selected month."><h3>Total Budget</h3><div class="amount" id="budget-total-amount">RM 0.00</div></div>
+                        <div class="summary-card" title="The sum of all expenses recorded in the selected month."><h3>Total Spent</h3><div class="amount" id="budget-spent-amount">RM 0.00</div></div>
+                        <div class="summary-card" title="Calculation: Total Budget - Total Spent for the selected month."><h3>Overall Remaining</h3><div class="amount" id="budget-overall-remaining">RM 0.00</div></div>
                     </div>
                     <div class="expenses-list" id="budget-list"></div>
                 </div>
                 <div id="categories-tab" class="tab-content">
                     <form id="category-form">
                         <div class="form-group"><label for="category-name">Category Name</label><input type="text" id="category-name" placeholder="e.g., Groceries" required></div>
-                        <div class="form-group">
-                            <label>Choose an Icon</label>
-                            <div id="icon-preset-grid"></div>
-                            <input type="hidden" id="selected-icon" required>
-                        </div>
+                        <div class="form-group"><label>Choose an Icon</label><div id="icon-preset-grid"></div><input type="hidden" id="selected-icon" required></div>
                         <button type="submit" class="btn">Add Category</button>
                     </form>
                     <div class="expenses-list" id="custom-categories-list" style="margin-top: 30px;">
                         <h3 style="margin-bottom: 20px; color: #2c3e50;">Your Categories</h3>
                     </div>
                 </div>
+                <div id="owed-tab" class="tab-content">
+                    <form id="owed-form">
+                        <div class="form-group"><label for="owed-person">Who Owes You?</label><input type="text" id="owed-person" placeholder="e.g., Sibling's Name" required></div>
+                        <div class="form-group"><label for="owed-amount">Amount (MYR)</label><input type="number" id="owed-amount" step="0.01" placeholder="0.00" required></div>
+                        <div class="form-group"><label for="owed-description">Description</label><textarea id="owed-description" rows="2" placeholder="e.g., Lunch, Cinema Tickets..."></textarea></div>
+                        <button type="submit" class="btn">Add Owed Entry</button>
+                    </form>
+                    <div class="expenses-list" id="owed-list" style="margin-top: 30px;"></div>
+                </div>
             </div>
         </div>
     </div>
     
-    <div id="image-modal" class="modal-overlay" onclick="hideImageModal()">
-        <div class="modal-content" style="padding: 10px; max-width: 90vw; max-height: 90vh; background: none; box-shadow: none;" onclick="event.stopPropagation()">
-            <button class="modal-close-btn" onclick="hideImageModal()">&times;</button>
-            <img id="image-modal-img" src="" alt="Full-size Image" style="max-width: 100%; max-height: calc(90vh - 20px); display: block; margin: auto;">
-        </div>
-    </div>
-
-
-    <div id="edit-category-modal" class="modal-overlay">
-        <div class="modal-content" style="padding:0;">
-            <div class="modal-header"><h2>Edit Category</h2><button class="modal-close-btn" onclick="hideEditModal()">&times;</button></div>
-            <form id="edit-category-form">
-                <div class="modal-body">
-                    <input type="hidden" id="edit-category-id">
-                    <div class="form-group"><label for="edit-category-name">Category Name</label><input type="text" id="edit-category-name" required></div>
-                    <div class="form-group">
-                        <label>Choose an Icon</label>
-                        <div id="edit-icon-preset-grid"></div>
-                        <input type="hidden" id="edit-selected-icon" required>
-                    </div>
-                </div>
-                <div class="modal-buttons">
-                    <button type="submit" class="btn">Save Changes</button>
-                    <button type="button" class="btn" style="background: #6c757d;" onclick="hideEditModal()">Cancel</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div id="edit-expense-modal" class="modal-overlay">
-        <div class="modal-content" style="padding:0;">
-            <form id="edit-expense-form">
-                <div class="modal-header">
-                    <h2>Edit Expense</h2>
-                    <button type="button" class="modal-close-btn" onclick="hideEditExpenseModal()">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" id="edit-expense-id">
-                    <input type="hidden" id="hidden-edit-pasted-image-url">
-                    <div class="form-group">
-                        <label for="edit-date">Date</label>
-                        <input type="date" id="edit-date" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="edit-category">Category</label>
-                        <select id="edit-category" required></select>
-                    </div>
-                    <div class="form-group">
-                        <label for="edit-amount">Amount (MYR)</label>
-                        <input type="number" id="edit-amount" step="0.01" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="edit-description">Description</label>
-                        <textarea id="edit-description" rows="3"></textarea>
-                    </div>
-
-                    <div class="form-group" id="edit-image-source-selector">
-                        <label>Image Source (Optional)</label>
-                        <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 10px;">
-                            <label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="edit-image-source" value="upload" checked> Upload Image</label>
-                            <label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="edit-image-source" value="paste"> Paste Image</label>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                         <div id="edit-image-upload-container">
-                            <div class="file-upload">
-                                <input type="file" id="edit-pasted-image-upload" accept="image/*">
-                                <label for="edit-pasted-image-upload" class="file-upload-label">
-                                    <span>🎨 Click to Upload Image</span>
-                                </label>
-                            </div>
-                        </div>
-                        <div id="edit-image-paste-container" style="display: none;">
-                             <div class="file-upload">
-                                <div id="edit-paste-image-box" class="file-upload-label" contenteditable="true"></div>
-                             </div>
-                        </div>
-                        <div class="progress-bar-container" id="edit-image-progress-container"><div class="progress-bar" id="edit-image-progress-bar"></div></div>
-                        <div id="edit-pasted-image-preview-container" style="display:none; margin-top: 10px; text-align: center;"></div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Upload Receipt/Proof</label>
-                        <div id="existing-receipt-container" style="display:none;">
-                            <a id="existing-receipt-link" href="#" target="_blank" rel="noopener noreferrer" class="receipt-link">View Current Receipt</a>
-                            <button type="button" id="remove-receipt-btn" class="delete-btn">Remove Receipt</button>
-                        </div>
-                        <div class="file-upload">
-                            <input type="file" id="edit-receipt" accept="image/*,.pdf">
-                            <label for="edit-receipt" class="file-upload-label" id="edit-file-label">
-                                <span id="edit-file-label-default">📁 Click to upload a new receipt</span>
-                                <span id="edit-file-label-selected" style="display: none;"></span>
-                            </label>
-                        </div>
-                         <div class="progress-bar-container" id="edit-progress-container"><div class="progress-bar" id="edit-progress-bar"></div></div>
-                    </div>
-                </div>
-                <div class="modal-buttons">
-                    <button type="submit" class="btn">Save Changes</button>
-                    <button type="button" class="btn" style="background: #6c757d;" onclick="hideEditExpenseModal()">Cancel</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    <div id="image-modal" class="modal-overlay" onclick="hideImageModal()"><div class="modal-content" style="padding: 10px; max-width: 90vw; max-height: 90vh; background: none; box-shadow: none;" onclick="event.stopPropagation()"><button class="modal-close-btn" onclick="hideImageModal()">&times;</button><img id="image-modal-img" src="" alt="Full-size Image" style="max-width: 100%; max-height: calc(90vh - 20px); display: block; margin: auto;"></div></div>
+    <div id="edit-category-modal" class="modal-overlay"><div class="modal-content" style="padding:0;"><div class="modal-header"><h2>Edit Category</h2><button class="modal-close-btn" onclick="hideEditModal()">&times;</button></div><form id="edit-category-form"><div class="modal-body"><input type="hidden" id="edit-category-id"><div class="form-group"><label for="edit-category-name">Category Name</label><input type="text" id="edit-category-name" required></div><div class="form-group"><label>Choose an Icon</label><div id="edit-icon-preset-grid"></div><input type="hidden" id="edit-selected-icon" required></div></div><div class="modal-buttons"><button type="submit" class="btn">Save Changes</button><button type="button" class="btn" style="background: #6c757d;" onclick="hideEditModal()">Cancel</button></div></form></div></div>
+    <div id="edit-expense-modal" class="modal-overlay"><div class="modal-content" style="padding:0;"><form id="edit-expense-form"><div class="modal-header"><h2>Edit Expense</h2><button type="button" class="modal-close-btn" onclick="hideEditExpenseModal()">&times;</button></div><div class="modal-body"><input type="hidden" id="edit-expense-id"><input type="hidden" id="hidden-edit-pasted-image-url"><div class="form-group"><label for="edit-date">Date</label><input type="date" id="edit-date" required></div><div class="form-group"><label for="edit-category">Category</label><select id="edit-category" required></select></div><div class="form-group"><label for="edit-amount">Amount (MYR)</label><input type="number" id="edit-amount" step="0.01" required></div><div class="form-group"><label for="edit-description">Description</label><textarea id="edit-description" rows="3"></textarea></div><div class="form-group"><label>Paid By</label><div style="display: flex; gap: 20px; align-items: center;"><label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="editPaidBy" value="Me"> Me</label><label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="editPaidBy" value="Wife"> Wife</label></div></div><div class="form-group" id="edit-image-source-selector"><label>Image Source (Optional)</label><div style="display: flex; gap: 20px; align-items: center; margin-bottom: 10px;"><label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="edit-image-source" value="upload" checked> Upload Image</label><label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="edit-image-source" value="paste"> Paste Image</label></div></div><div class="form-group"><div id="edit-image-upload-container"><div class="file-upload"><input type="file" id="edit-pasted-image-upload" accept="image/*"><label for="edit-pasted-image-upload" class="file-upload-label"><span>🎨 Click to Upload Image</span></label></div></div><div id="edit-image-paste-container" style="display: none;"><div class="file-upload"><div id="edit-paste-image-box" class="file-upload-label" contenteditable="true"></div></div></div><div class="progress-bar-container" id="edit-image-progress-container"><div class="progress-bar" id="edit-image-progress-bar"></div></div><div id="edit-pasted-image-preview-container" style="display:none; margin-top: 10px; text-align: center;"></div></div><div class="form-group"><label>Upload Receipt/Proof</label><div id="existing-receipt-container" style="display:none;"><a id="existing-receipt-link" href="#" target="_blank" rel="noopener noreferrer" class="receipt-link">View Current Receipt</a><button type="button" id="remove-receipt-btn" class="delete-btn">Remove Receipt</button></div><div class="file-upload"><input type="file" id="edit-receipt" accept="image/*,.pdf"><label for="edit-receipt" class="file-upload-label" id="edit-file-label"><span id="edit-file-label-default">📁 Click to upload a new receipt</span><span id="edit-file-label-selected" style="display: none;"></span></label></div><div class="progress-bar-container" id="edit-progress-container"><div class="progress-bar" id="edit-progress-bar"></div></div></div></div><div class="modal-buttons"><button type="submit" class="btn">Save Changes</button><button type="button" class="btn" style="background: #6c757d;" onclick="hideEditExpenseModal()">Cancel</button></div></form></div></div>
 
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/plugins/monthSelect/index.js"></script>
@@ -448,8 +324,8 @@
         let allCategories = [];
         let allSalaries = {};
         let allBudgets = {};
+        let allOwedMoney = [];
         let isInitialExpenseLoad = true;
-        let categoryBreakdownView = 'month'; // 'month' or 'allTime'
         let tempPastedImageUrl = null; 
         const presetIcons = [ '🏡', '💡', '💧', '🌐', '🛋️', '📺', '🚗', '⛽', '🛣️', '🅿️', '🔧', '📱', '🎬', '🎵', '🧸', '🍼', '🛒', '🧽', '💳', '📦', '🍴', '🛵', '🎮', '🎥', '⚽', '🎸', '🏥', '💊', '🏋️', '💰', '📈', '📶', '👨‍👩‍👦' ];
 
@@ -510,6 +386,15 @@
                 updateSummary();
             });
         }
+        
+        function listenForOwedMoney() {
+            const q = fb.query(fb.collection(db, "owedMoney"), fb.orderBy("timestamp", "desc"));
+            fb.onSnapshot(q, (snapshot) => {
+                allOwedMoney = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                displayOwedMoney();
+                updateSummary();
+            });
+        }
 
         function updateSalaryInputForMonth(monthStr) {
             const salaryAmountInput = document.getElementById('salary-amount');
@@ -566,6 +451,7 @@
                 category: document.getElementById('category').value, 
                 amount: parseFloat(document.getElementById('amount').value), 
                 description: document.getElementById('description').value, 
+                paidBy: document.querySelector('input[name="paidBy"]:checked').value,
                 receipt: receiptURL, 
                 pastedImage: pastedImageURL,
                 timestamp: new Date().toISOString() 
@@ -603,6 +489,23 @@
             if (!name || !icon) { return alert("Please enter a name and select an icon."); }
             if (await fb.addDoc(fb.collection(db, "categories"), { name, icon })) {
                  this.reset(); document.getElementById('selected-icon').value = ''; document.querySelector('#icon-preset-grid .icon-preset.selected')?.classList.remove('selected'); alert('Category added!');
+            }
+        });
+
+        document.getElementById('owed-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const owedEntry = {
+                person: document.getElementById('owed-person').value,
+                amount: parseFloat(document.getElementById('owed-amount').value),
+                description: document.getElementById('owed-description').value,
+                date: new Date().toISOString().split('T')[0],
+                status: 'Owed',
+                timestamp: new Date().toISOString()
+            };
+
+            if (await fb.addDoc(fb.collection(db, "owedMoney"), owedEntry)) {
+                this.reset();
+                alert('Owed entry added!');
             }
         });
 
@@ -695,7 +598,7 @@
             updateSummary();
             displayCategories();
             displayBudgets();
-            updateAddExpenseBudgetInfo();
+            displayOwedMoney();
         }
 
         function displayExpenses(filtered = null) {
@@ -714,6 +617,8 @@
                     descriptionHTML += `<br><img src="${exp.pastedImage}" alt="Pasted content" onclick="showImageModal('${exp.pastedImage}')" />`;
                 }
                 
+                const paidByTag = exp.paidBy ? `<span style="font-size: 12px; color: #8898aa; margin-left: 10px;">(Paid by: ${exp.paidBy})</span>` : '';
+
                 const actionButtons = isViewOnlyMode ? '' : `
                     <div class="expense-actions" style="margin-top: 15px; display: flex; gap: 10px;">
                         <button class="btn" style="padding: 8px 12px; font-size: 14px; background: #ffc107;" onclick="showEditExpenseModal('${exp.id}')">Edit</button>
@@ -723,7 +628,7 @@
                 <div class="expense-item">
                     <div class="expense-header">
                         <div><span class="expense-category">${icon} ${exp.category}</span></div>
-                        <div class="expense-amount">RM ${exp.amount.toFixed(2)}</div>
+                        <div class="expense-amount">RM ${exp.amount.toFixed(2)}${paidByTag}</div>
                     </div>
                     <div class="expense-details">${descriptionHTML}</div>
                     <div class="expense-date">📅 ${formatDate(exp.date)}</div>
@@ -732,6 +637,48 @@
                 </div>`;
             }).join('');
         }
+        
+        function displayOwedMoney() {
+            const list = document.getElementById('owed-list');
+            const owedToShow = allOwedMoney.filter(o => o.status === 'Owed');
+
+            if (owedToShow.length === 0) {
+                list.innerHTML = `<h3 style="margin-bottom: 20px; color: #2c3e50;">Currently Owed</h3><div class="no-expenses" style="padding: 20px;"><p>No outstanding debts.</p></div>`;
+                return;
+            }
+
+            list.innerHTML = `<h3 style="margin-bottom: 20px; color: #2c3e50;">Currently Owed</h3>` + owedToShow.map(item => `
+                <div class="expense-item">
+                    <div class="expense-header">
+                        <div>
+                            <span class="expense-category" style="background: #ffc107; color: #212529;">${item.person}</span>
+                            <div style="font-size: 14px; color: #657786; margin-top: 8px;">${item.description || 'No description'}</div>
+                        </div>
+                        <div class="expense-amount">RM ${item.amount.toFixed(2)}</div>
+                    </div>
+                    <div class="expense-date">Recorded: ${formatDate(item.date)}</div>
+                    <div style="margin-top: 15px;">
+                        <button class="btn" style="padding: 8px 12px; font-size: 14px; background: #28a745;" onclick="markOwedAsPaid(event, '${item.id}')">Mark as Paid</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function markOwedAsPaid(event, id) {
+            if (isViewOnlyMode) return;
+            const button = event.target;
+            button.disabled = true;
+            button.textContent = 'Updating...';
+            try {
+                await fb.updateDoc(fb.doc(db, "owedMoney", id), { status: 'Paid' });
+            } catch (error) {
+                console.error("Error updating owed status:", error);
+                alert("Failed to update status.");
+                button.disabled = false;
+                button.textContent = 'Mark as Paid';
+            }
+        }
+
 
         function displayCategories() {
             const list = document.getElementById('custom-categories-list');
@@ -753,95 +700,27 @@
             const now = new Date();
             const currentMonthStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
             const monthExpenses = allExpenses.filter(exp => exp.date.startsWith(currentMonthStr));
-            const monthTotalExpenses = monthExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+            
+            const totalMonthExpenses = monthExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+            const mySpending = monthExpenses.filter(e => e.paidBy === 'Me').reduce((sum, exp) => sum + exp.amount, 0);
+            const wifeSpending = monthExpenses.filter(e => e.paidBy === 'Wife').reduce((sum, exp) => sum + exp.amount, 0);
+            
             const currentMonthSalary = allSalaries[currentMonthStr] ? allSalaries[currentMonthStr].amount : 0;
-            const remainingFromSalary = currentMonthSalary - monthTotalExpenses;
-            const currentMonthBudgets = allBudgets[currentMonthStr] || {};
-            const totalMonthBudget = Object.values(currentMonthBudgets).reduce((sum, val) => sum + val, 0);
-            const remainingFromBudget = totalMonthBudget - monthTotalExpenses;
-            document.getElementById('month-amount').textContent = `RM ${monthTotalExpenses.toFixed(2)}`;
+            const remainingFromSalary = currentMonthSalary - mySpending;
+            
+            const totalOwed = allOwedMoney.filter(o => o.status === 'Owed').reduce((sum, item) => sum + item.amount, 0);
+
+            document.getElementById('month-amount').textContent = `RM ${totalMonthExpenses.toFixed(2)}`;
+            document.getElementById('my-spending').textContent = `RM ${mySpending.toFixed(2)}`;
+            document.getElementById('wife-spending').textContent = `RM ${wifeSpending.toFixed(2)}`;
             document.getElementById('month-salary').textContent = `RM ${currentMonthSalary.toFixed(2)}`;
             document.getElementById('remaining-balance').textContent = `RM ${remainingFromSalary.toFixed(2)}`;
-            document.getElementById('budget-remaining-balance').textContent = `RM ${remainingFromBudget.toFixed(2)}`;
+            document.getElementById('owed-to-me').textContent = `RM ${totalOwed.toFixed(2)}`;
+            
             const summaryHeader = document.getElementById('summary-month-header');
             summaryHeader.textContent = `Summary for ${now.toLocaleString('default', { month: 'long' })} ${now.getFullYear()}`;
-            const breakdownTitle = document.getElementById('category-breakdown-title');
-            const list = document.getElementById('category-list');
-            breakdownTitle.textContent = `Category Breakdown (${categoryBreakdownView === 'month' ? 'This Month' : 'All Time'})`;
-            if (categoryBreakdownView === 'month') {
-                const categoryTotals = monthExpenses.reduce((acc, exp) => { acc[exp.category] = (acc[exp.category] || 0) + exp.amount; return acc; }, {});
-                if (allCategories.length === 0) {
-                    list.innerHTML = '<p style="color: #8898aa;">No categories to display. Add a category first.</p>';
-                    return;
-                }
-                list.innerHTML = allCategories.map(cat => {
-                    const spentAmount = categoryTotals[cat.name] || 0;
-                    const budgetAmount = currentMonthBudgets[cat.name] || 0;
-                    if (spentAmount === 0 && budgetAmount === 0) return '';
-                    const remaining = budgetAmount - spentAmount;
-                    const progress = budgetAmount > 0 ? (spentAmount / budgetAmount) * 100 : (spentAmount > 0 ? 101 : 0);
-                    return `
-                    <div class="expense-item">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                             <span class="expense-category" style="font-size: 15px;">${cat.icon} ${cat.name}</span>
-                             <span style="font-weight: 700; font-size: 16px;">RM ${spentAmount.toFixed(2)}</span>
-                        </div>
-                        <div class="budget-item-details">
-                            <div class="budget-progress-bar-container">
-                                <div class="budget-progress-bar ${progress > 100 ? 'over' : 'normal'}" style="width: ${Math.min(progress, 100)}%;"></div>
-                            </div>
-                            <div class="budget-info">
-                                <span>Budget: RM ${budgetAmount.toFixed(2)}</span>
-                                <span class="budget-remaining ${remaining < 0 ? 'negative' : ''}">Remaining: RM ${remaining.toFixed(2)}</span>
-                            </div>
-                        </div>
-                    </div>`;
-                }).join('');
-            } else {
-                const totalAllTimeExpenses = allExpenses.reduce((sum, exp) => sum + exp.amount, 0);
-                const categoryTotals = allExpenses.reduce((acc, exp) => { acc[exp.category] = (acc[exp.category] || 0) + exp.amount; return acc; }, {});
-                if (Object.keys(categoryTotals).length === 0) {
-                    list.innerHTML = '<p style="color: #8898aa;">No expenses to analyze for this period.</p>';
-                } else {
-                    list.innerHTML = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1]).map(([name, amount]) => {
-                        const pct = totalAllTimeExpenses > 0 ? (amount / totalAllTimeExpenses * 100).toFixed(1) : 0;
-                        const icon = allCategories.find(c => c.name === name)?.icon || '📌';
-                        return `<div class="expense-item category-breakdown-item"><div><span class="expense-category">${icon} ${name}</span></div><div><span style="font-weight: 700;">RM ${amount.toFixed(2)}</span><span style="color: #8898aa; font-size: 14px;"> (${pct}%)</span></div></div>`;
-                    }).join('');
-                }
-            }
-            if (!list.innerHTML.trim()) {
-                list.innerHTML = '<p style="color: #8898aa;">No activity to display for this period.</p>';
-            }
         }
         
-        function updateAddExpenseBudgetInfo() {
-            const infoBox = document.getElementById('add-expense-budget-info');
-            const categoryName = document.getElementById('category').value;
-
-            if (!categoryName) {
-                infoBox.style.display = 'none';
-                return;
-            }
-
-            const now = new Date();
-            const currentMonthStr = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
-            const budgetAmount = allBudgets[currentMonthStr]?.[categoryName] || 0;
-            const spentAmount = allExpenses
-                .filter(exp => exp.date.startsWith(currentMonthStr) && exp.category === categoryName)
-                .reduce((sum, exp) => sum + exp.amount, 0);
-            
-            const remainingAmount = budgetAmount - spentAmount;
-
-            document.getElementById('budget-info-total').textContent = `RM ${budgetAmount.toFixed(2)}`;
-            document.getElementById('budget-info-spent').textContent = `RM ${spentAmount.toFixed(2)}`;
-            const remainingEl = document.getElementById('budget-info-remaining');
-            remainingEl.textContent = `RM ${remainingAmount.toFixed(2)}`;
-            remainingEl.style.color = remainingAmount < 0 ? '#d63031' : '#28a745';
-
-            infoBox.style.display = 'block';
-        }
-
         function displayBudgets() {
             const month = document.getElementById('budget-month').value;
             const list = document.getElementById('budget-list');
@@ -958,20 +837,19 @@
         function filterExpenses() {
             const month = document.getElementById('filter-month').value; 
             const category = document.getElementById('filter-category').value;
+            const paidBy = document.getElementById('filter-paid-by').value;
             const sortMethod = document.getElementById('sort-expenses').value;
 
             let filtered = [...allExpenses];
             if (month) filtered = filtered.filter(e => e.date.startsWith(month));
             if (category) filtered = filtered.filter(e => e.category === category);
+            if (paidBy) filtered = filtered.filter(e => e.paidBy === paidBy);
             
             switch(sortMethod) {
                 case 'date-asc': filtered.sort((a,b) => new Date(a.date) - new Date(b.date)); break;
                 case 'amount-desc': filtered.sort((a,b) => b.amount - a.amount); break;
                 case 'amount-asc': filtered.sort((a,b) => a.amount - b.amount); break;
-                case 'date-desc': // This is the default from Firestore
-                default:
-                    filtered.sort((a,b) => new Date(b.date) - new Date(a.date));
-                    break;
+                case 'date-desc': default: filtered.sort((a,b) => new Date(b.date) - new Date(a.date)); break;
             }
 
             displayExpenses(filtered);
@@ -984,7 +862,7 @@
         function formatDate(dateStr) { const d = new Date(dateStr); return d.toLocaleDateString('en-MY', { timeZone: 'UTC', year: 'numeric', month: 'long', day: 'numeric' }); }
         function exportData() {
             if (isViewOnlyMode) return;
-            const dataStr = JSON.stringify({ expenses: allExpenses, categories: allCategories, salaries: allSalaries, budgets: allBudgets }, null, 2);
+            const dataStr = JSON.stringify({ expenses: allExpenses, categories: allCategories, salaries: allSalaries, budgets: allBudgets, owedMoney: allOwedMoney }, null, 2);
             const blob = new Blob([dataStr], { type: 'application/json' }); const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href = url; a.download = `expenses_data_${new Date().toISOString().split('T')[0]}.json`;
             a.click(); URL.revokeObjectURL(url);
@@ -1017,6 +895,7 @@
             document.getElementById('edit-date').value = expense.date;
             document.getElementById('edit-amount').value = expense.amount;
             document.getElementById('edit-description').value = expense.description;
+            document.querySelector(`input[name="editPaidBy"][value="${expense.paidBy || 'Me'}"]`).checked = true;
             document.getElementById('hidden-edit-pasted-image-url').value = expense.pastedImage || '';
 
             if (expense.pastedImage) {
@@ -1062,6 +941,7 @@
             document.querySelector('.tab[data-tab-name="add"]').style.display = 'none';
             document.querySelector('.tab[data-tab-name="categories"]').style.display = 'none';
             document.querySelector('.tab[data-tab-name="budget"]').style.display = 'none';
+             document.querySelector('.tab[data-tab-name="owed"]').style.display = 'none';
             document.getElementById('salary-section').style.display = 'none';
             document.querySelector('.export-btn').style.display = 'none';
             document.querySelectorAll('.tab[data-tab-name="view"]')[0].click();
@@ -1109,6 +989,7 @@
                     category: document.getElementById('edit-category').value, 
                     amount: parseFloat(document.getElementById('edit-amount').value), 
                     description: document.getElementById('edit-description').value, 
+                    paidBy: document.querySelector('input[name="editPaidBy"]:checked').value,
                     receipt: newReceiptURL,
                     pastedImage: document.getElementById('hidden-edit-pasted-image-url').value || null
                 };
@@ -1282,22 +1163,6 @@
                     }
                 );
             });
-
-            document.getElementById('view-month-btn').addEventListener('click', () => {
-                categoryBreakdownView = 'month';
-                document.getElementById('view-month-btn').classList.add('active');
-                document.getElementById('view-all-btn').classList.remove('active');
-                updateSummary();
-            });
-
-            document.getElementById('view-all-btn').addEventListener('click', () => {
-                categoryBreakdownView = 'allTime';
-                document.getElementById('view-all-btn').classList.add('active');
-                document.getElementById('view-month-btn').classList.remove('active');
-                updateSummary();
-            });
-            
-            document.getElementById('category').addEventListener('change', updateAddExpenseBudgetInfo);
             
             document.querySelectorAll('input[name="image-source"]').forEach(radio => {
                 radio.addEventListener('change', function() {
@@ -1355,6 +1220,7 @@
             listenForCategories();
             listenForExpenses();
             listenForBudgets();
+            listenForOwedMoney();
             setupViewOnlyUI();
         });
     </script>
