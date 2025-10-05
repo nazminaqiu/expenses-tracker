@@ -795,6 +795,10 @@
                 const spentAmount = expensesForMonth.filter(e => e.category === cat.name).reduce((sum, e) => sum + e.amount, 0);
                 const remaining = budgetAmount - spentAmount;
                 const progress = budgetAmount > 0 ? (spentAmount / budgetAmount) * 100 : (spentAmount > 0 ? 101 : 0);
+                
+                const inputDisabled = isViewOnlyMode ? 'disabled' : '';
+                const saveButtonHTML = isViewOnlyMode ? '' : `<button class="btn btn-small" onclick="saveBudget('${cat.name}')">Save</button>`;
+
                 return `
                 <div class="expense-item">
                     <div class="budget-item">
@@ -803,8 +807,8 @@
                             <span style="font-weight: 600;">${cat.name}</span>
                         </div>
                         <div class="budget-input-group">
-                             <input type="number" step="1" min="0" placeholder="0.00" class="budget-input" data-category="${cat.name}" value="${budgetAmount > 0 ? budgetAmount.toFixed(2) : ''}">
-                             <button class="btn btn-small" onclick="saveBudget('${cat.name}')">Save</button>
+                             <input type="number" step="1" min="0" placeholder="0.00" class="budget-input" data-category="${cat.name}" value="${budgetAmount > 0 ? budgetAmount.toFixed(2) : ''}" ${inputDisabled}>
+                             ${saveButtonHTML}
                         </div>
                         <div class="budget-item-details">
                             <div class="budget-progress-bar-container">
@@ -997,7 +1001,7 @@
 
             document.querySelectorAll('.tab').forEach(tab => {
                 const tabName = tab.dataset.tabName;
-                if (tabName !== 'summary' && tabName !== 'view' && tabName !== 'budget') {
+                if (!['summary', 'view', 'budget'].includes(tabName)) {
                     tab.style.display = 'none';
                 }
             });
