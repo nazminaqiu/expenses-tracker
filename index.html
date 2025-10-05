@@ -783,7 +783,11 @@
             const totalMonthIncome = monthIncome.reduce((sum, inc) => sum + inc.amount, 0);
 
             const currentMonthSalary = allSalaries[currentMonthStr] ? allSalaries[currentMonthStr].amount : 0;
-            const remainingFromSalary = (currentMonthSalary + totalMonthIncome) - mySpending;
+            
+            let remainingFromSalary = (currentMonthSalary + totalMonthIncome) - mySpending;
+            if (isViewOnlyMode) {
+                remainingFromSalary = currentMonthSalary - mySpending; // Simpler calculation for view only
+            }
             
             const totalOwed = allOwedMoney.filter(o => o.status === 'Owed').reduce((sum, item) => sum + item.amount, 0);
 
@@ -1028,13 +1032,29 @@
         function setupViewOnlyUI() {
             if (!isViewOnlyMode) return;
             document.getElementById('header-subtitle').textContent = "View-Only Access";
+
+            // Hide tabs
             document.querySelector('.tab[data-tab-name="add"]').style.display = 'none';
-            document.querySelector('.tab[data-tab-name="categories"]').style.display = 'none';
+            document.querySelector('.tab[data-tab-name="income"]').style.display = 'none';
             document.querySelector('.tab[data-tab-name="budget"]').style.display = 'none';
-             document.querySelector('.tab[data-tab-name="owed"]').style.display = 'none';
+            document.querySelector('.tab[data-tab-name="owed"]').style.display = 'none';
+            document.querySelector('.tab[data-tab-name="categories"]').style.display = 'none';
+
+            // Hide specific UI elements
             document.getElementById('salary-section').style.display = 'none';
             document.querySelector('.export-btn').style.display = 'none';
-            document.querySelectorAll('.tab[data-tab-name="view"]')[0].click();
+            
+            const incomeCard = document.getElementById('month-income');
+            if (incomeCard) {
+                incomeCard.closest('.summary-card').style.display = 'none';
+            }
+            
+            const remainingBalanceCard = document.getElementById('remaining-balance');
+            if(remainingBalanceCard) {
+                remainingBalanceCard.closest('.summary-card').title = 'Your Salary - Your Spending.';
+            }
+            
+            document.querySelector('.tab[data-tab-name="summary"]').click();
         }
 
         document.getElementById('edit-expense-form').addEventListener('submit', async function(e) {
