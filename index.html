@@ -172,16 +172,16 @@
         </div>
         <div class="main-card">
             <div class="tabs">
-                <button class="tab active" data-tab-name="add" onclick="switchTab(event, 'add')">Add Expense</button>
+                <button class="tab active" data-tab-name="summary" onclick="switchTab(event, 'summary')">Summary</button>
+                <button class="tab" data-tab-name="add" onclick="switchTab(event, 'add')">Add Expense</button>
                 <button class="tab" data-tab-name="view" onclick="switchTab(event, 'view')">View Expenses</button>
-                <button class="tab" data-tab-name="summary" onclick="switchTab(event, 'summary')">Summary</button>
                 <button class="tab" data-tab-name="income" onclick="switchTab(event, 'income')">Income</button>
-                <button class="tab" data-tab-name="owed" onclick="switchTab(event, 'owed')">Owed Money</button>
                 <button class="tab" data-tab-name="budget" onclick="switchTab(event, 'budget')">Budget</button>
+                <button class="tab" data-tab-name="owed" onclick="switchTab(event, 'owed')">Owed Money</button>
                 <button class="tab" data-tab-name="categories" onclick="switchTab(event, 'categories')">Categories</button>
             </div>
             <div class="content">
-                <div id="add-tab" class="tab-content active">
+                <div id="add-tab" class="tab-content">
                     <form id="expense-form">
                         <div class="form-group"><label for="date">Date</label><input type="date" id="date" required></div>
                         <div class="form-group">
@@ -260,7 +260,7 @@
                     </div>
                     <div class="expenses-list" id="expenses-list"></div>
                 </div>
-                <div id="summary-tab" class="tab-content">
+                <div id="summary-tab" class="tab-content active">
                     <h2 id="summary-month-header" style="text-align: center; margin-bottom: 25px; color: #2c3e50;"></h2>
                     <div class="summary-cards">
                         <div class="summary-card" title="Your salary for the current month."><h3>Your Salary</h3><div class="amount" id="month-salary">RM 0.00</div></div>
