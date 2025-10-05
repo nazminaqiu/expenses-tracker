@@ -150,14 +150,14 @@
         .payer-slider { position: relative; }
         .payer-slider input[type="checkbox"] { display: none; }
         .payer-slider .slider-label { display: flex; align-items: center; justify-content: space-around; width: 110px; height: 45px; background-color: #e1e8ed; border-radius: 25px; cursor: pointer; position: relative; transition: background-color 0.3s ease; padding: 0 10px; }
-        .payer-slider .slider-label::after { content: ''; position: absolute; left: 4px; top: 4px; width: 37px; height: 37px; background-color: white; border-radius: 50%; transition: left 0.3s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .payer-slider .slider-label::after { content: ''; position: absolute; left: 4px; top: 4px; width: 37px; height: 37px; background-color: white; border-radius: 50%; transition: left 0.3s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 1; }
         .payer-slider input:checked + .slider-label { background: linear-gradient(135deg, #667eea, #764ba2); }
         .payer-slider input:checked + .slider-label::after { left: calc(100% - 41px); }
-        .payer-slider .slider-label span { z-index: 1; font-weight: 600; font-size: 14px; transition: color 0.3s ease; }
+        .payer-slider .slider-label span { position: relative; z-index: 2; font-weight: 600; font-size: 14px; transition: color 0.3s ease; }
         .payer-slider .slider-label .label-me { color: #2c3e50; }
         .payer-slider .slider-label .label-wife { color: #8898aa; }
-        .payer-slider input:checked + .slider-label .label-me { color: #e1e8ed; }
-        .payer-slider input:checked + .slider-label .label-wife { color: white; }
+        .payer-slider input:checked + .slider-label .label-me { color: white; }
+        .payer-slider input:checked + .slider-label .label-wife { color: #2c3e50; }
 
         @media (max-width: 768px) {
             .container { padding: 0 10px; }
@@ -469,6 +469,7 @@
             
             if (success) { 
                 this.reset(); 
+                document.getElementById('paidBy-slider').checked = false;
                 clearFileInput(null, false);
                 clearPastedImage(null, false, 'add');
                 flatpickr("#date").setDate("today"); 
