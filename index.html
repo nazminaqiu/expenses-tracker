@@ -313,6 +313,7 @@
     <div id="image-modal" class="modal-overlay" onclick="hideImageModal()"><div class="modal-content" style="padding: 10px; max-width: 90vw; max-height: 90vh; background: none; box-shadow: none;" onclick="event.stopPropagation()"><button class="modal-close-btn" onclick="hideImageModal()">&times;</button><img id="image-modal-img" src="" alt="Full-size Image" style="max-width: 100%; max-height: calc(90vh - 20px); display: block; margin: auto;"></div></div>
     <div id="edit-category-modal" class="modal-overlay"><div class="modal-content" style="padding:0;"><div class="modal-header"><h2>Edit Category</h2><button class="modal-close-btn" onclick="hideEditModal()">&times;</button></div><form id="edit-category-form"><div class="modal-body"><input type="hidden" id="edit-category-id"><div class="form-group"><label for="edit-category-name">Category Name</label><input type="text" id="edit-category-name" required></div><div class="form-group"><label>Choose an Icon</label><div id="edit-icon-preset-grid"></div><input type="hidden" id="edit-selected-icon" required></div></div><div class="modal-buttons"><button type="submit" class="btn">Save Changes</button><button type="button" class="btn" style="background: #6c757d;" onclick="hideEditModal()">Cancel</button></div></form></div></div>
     <div id="edit-expense-modal" class="modal-overlay"><div class="modal-content" style="padding:0;"><form id="edit-expense-form"><div class="modal-header"><h2>Edit Expense</h2><button type="button" class="modal-close-btn" onclick="hideEditExpenseModal()">&times;</button></div><div class="modal-body"><input type="hidden" id="edit-expense-id"><input type="hidden" id="hidden-edit-pasted-image-url"><div class="form-group"><label for="edit-date">Date</label><input type="date" id="edit-date" required></div><div class="form-group"><label for="edit-category">Category</label><select id="edit-category" required></select></div><div class="form-group"><label for="edit-amount">Amount (MYR)</label><input type="number" id="edit-amount" step="0.01" required></div><div class="form-group"><label for="edit-description">Description</label><textarea id="edit-description" rows="3"></textarea></div><div class="form-group"><label>Paid By</label><div style="display: flex; gap: 20px; align-items: center;"><label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="editPaidBy" value="Me"> Me</label><label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="editPaidBy" value="Wife"> Wife</label></div></div><div class="form-group" id="edit-image-source-selector"><label>Image Source (Optional)</label><div style="display: flex; gap: 20px; align-items: center; margin-bottom: 10px;"><label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="edit-image-source" value="upload" checked> Upload Image</label><label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="edit-image-source" value="paste"> Paste Image</label></div></div><div class="form-group"><div id="edit-image-upload-container"><div class="file-upload"><input type="file" id="edit-pasted-image-upload" accept="image/*"><label for="edit-pasted-image-upload" class="file-upload-label"><span>🎨 Click to Upload Image</span></label></div></div><div id="edit-image-paste-container" style="display: none;"><div class="file-upload"><div id="edit-paste-image-box" class="file-upload-label" contenteditable="true"></div></div></div><div class="progress-bar-container" id="edit-image-progress-container"><div class="progress-bar" id="edit-image-progress-bar"></div></div><div id="edit-pasted-image-preview-container" style="display:none; margin-top: 10px; text-align: center;"></div></div><div class="form-group"><label>Upload Receipt/Proof</label><div id="existing-receipt-container" style="display:none;"><a id="existing-receipt-link" href="#" target="_blank" rel="noopener noreferrer" class="receipt-link">View Current Receipt</a><button type="button" id="remove-receipt-btn" class="delete-btn">Remove Receipt</button></div><div class="file-upload"><input type="file" id="edit-receipt" accept="image/*,.pdf"><label for="edit-receipt" class="file-upload-label" id="edit-file-label"><span id="edit-file-label-default">📁 Click to upload a new receipt</span><span id="edit-file-label-selected" style="display: none;"></span></label></div><div class="progress-bar-container" id="edit-progress-container"><div class="progress-bar" id="edit-progress-bar"></div></div></div></div><div class="modal-buttons"><button type="submit" class="btn">Save Changes</button><button type="button" class="btn" style="background: #6c757d;" onclick="hideEditExpenseModal()">Cancel</button></div></form></div></div>
+    <div id="edit-owed-modal" class="modal-overlay"><div class="modal-content" style="padding:0;"><div class="modal-header"><h2>Edit Owed Entry</h2><button class="modal-close-btn" onclick="hideEditOwedModal()">&times;</button></div><form id="edit-owed-form"><div class="modal-body"><input type="hidden" id="edit-owed-id"><div class="form-group"><label for="edit-owed-person">Who Owes You?</label><input type="text" id="edit-owed-person" required></div><div class="form-group"><label for="edit-owed-amount">Amount (MYR)</label><input type="number" id="edit-owed-amount" step="0.01" required></div><div class="form-group"><label for="edit-owed-description">Description</label><textarea id="edit-owed-description" rows="2"></textarea></div></div><div class="modal-buttons"><button type="submit" class="btn">Save Changes</button><button type="button" class="btn" style="background: #6c757d;" onclick="hideEditOwedModal()">Cancel</button></div></form></div></div>
 
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/plugins/monthSelect/index.js"></script>
@@ -350,8 +351,8 @@
             button.disabled = true;
             const originalText = button.textContent;
             button.textContent = 'Deleting...';
-            const editButton = button.closest('.expense-actions')?.querySelector('.btn');
-            if (editButton) editButton.disabled = true;
+            const actionButtons = button.closest('.expense-actions') || button.closest('div');
+            actionButtons.querySelectorAll('button').forEach(btn => btn.disabled = true);
 
             const docRef = fb.doc(db, collectionName, id);
 
@@ -372,9 +373,8 @@
                 await fb.deleteDoc(docRef);
             } catch (error) {
                 console.error(`Error deleting document from ${collectionName}:`, error);
-                button.disabled = false;
                 button.textContent = originalText;
-                if (editButton) editButton.disabled = false;
+                 actionButtons.querySelectorAll('button').forEach(btn => btn.disabled = false);
             }
         }
         
@@ -517,6 +517,25 @@
             try { await fb.updateDoc(fb.doc(db, "categories", id), updatedData); alert("Category updated!"); hideEditModal(); } catch (error) { console.error("Error updating category:", error); alert("Failed to update category."); }
         });
         
+         document.getElementById('edit-owed-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            if (isViewOnlyMode) return;
+            const id = document.getElementById('edit-owed-id').value;
+            const updatedData = { 
+                person: document.getElementById('edit-owed-person').value,
+                amount: parseFloat(document.getElementById('edit-owed-amount').value),
+                description: document.getElementById('edit-owed-description').value
+            };
+            try { 
+                await fb.updateDoc(fb.doc(db, "owedMoney", id), updatedData); 
+                alert("Owed entry updated!"); 
+                hideEditOwedModal(); 
+            } catch (error) { 
+                console.error("Error updating owed entry:", error); 
+                alert("Failed to update owed entry."); 
+            }
+        });
+        
         async function clearFileInput(event, deleteFromStorage = true) {
             const button = event ? event.target : null;
             const hiddenUrlInput = document.getElementById('hidden-receipt-url');
@@ -646,6 +665,11 @@
                 list.innerHTML = `<h3 style="margin-bottom: 20px; color: #2c3e50;">Currently Owed</h3><div class="no-expenses" style="padding: 20px;"><p>No outstanding debts.</p></div>`;
                 return;
             }
+            
+            const actionButtons = (itemId) => isViewOnlyMode ? '' : `
+                <button class="btn" style="padding: 8px 12px; font-size: 14px; background: #ffc107; margin-right: 10px;" onclick="showEditOwedModal('${itemId}')">Edit</button>
+                <button class="delete-btn" style="margin-top: 0;" onclick="deleteFromDB(event, 'owedMoney', '${itemId}')">Delete</button>
+            `;
 
             list.innerHTML = `<h3 style="margin-bottom: 20px; color: #2c3e50;">Currently Owed</h3>` + owedToShow.map(item => `
                 <div class="expense-item">
@@ -657,8 +681,9 @@
                         <div class="expense-amount">RM ${item.amount.toFixed(2)}</div>
                     </div>
                     <div class="expense-date">Recorded: ${formatDate(item.date)}</div>
-                    <div style="margin-top: 15px;">
+                    <div style="margin-top: 15px; display: flex; gap: 10px;">
                         <button class="btn" style="padding: 8px 12px; font-size: 14px; background: #28a745;" onclick="markOwedAsPaid(event, '${item.id}')">Mark as Paid</button>
+                        ${actionButtons(item.id)}
                     </div>
                 </div>
             `).join('');
@@ -875,6 +900,18 @@
             document.getElementById('edit-category-modal').style.display = 'flex';
         }
         function hideEditModal() { document.getElementById('edit-category-modal').style.display = 'none'; }
+        
+        function showEditOwedModal(id) {
+            if (isViewOnlyMode) return;
+            const entry = allOwedMoney.find(o => o.id === id);
+            if (!entry) return;
+            document.getElementById('edit-owed-id').value = entry.id;
+            document.getElementById('edit-owed-person').value = entry.person;
+            document.getElementById('edit-owed-amount').value = entry.amount;
+            document.getElementById('edit-owed-description').value = entry.description;
+            document.getElementById('edit-owed-modal').style.display = 'flex';
+        }
+        function hideEditOwedModal() { document.getElementById('edit-owed-modal').style.display = 'none'; }
         
         function showImageModal(imageUrl) {
             document.getElementById('image-modal-img').src = imageUrl;
