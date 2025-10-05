@@ -145,6 +145,20 @@
         #receipt-preview-container { margin-top: 15px; text-align: center; }
         #receipt-preview-container img { max-width: 100%; max-height: 200px; border-radius: 10px; border: 2px solid #e1e8ed; }
 
+        .amount-payer-group { display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: flex-end; }
+        .payer-slider-container { margin-bottom: 3px; }
+        .payer-slider { position: relative; }
+        .payer-slider input[type="checkbox"] { display: none; }
+        .payer-slider .slider-label { display: flex; align-items: center; justify-content: space-around; width: 110px; height: 45px; background-color: #e1e8ed; border-radius: 25px; cursor: pointer; position: relative; transition: background-color 0.3s ease; padding: 0 10px; }
+        .payer-slider .slider-label::after { content: ''; position: absolute; left: 4px; top: 4px; width: 37px; height: 37px; background-color: white; border-radius: 50%; transition: left 0.3s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .payer-slider input:checked + .slider-label { background: linear-gradient(135deg, #667eea, #764ba2); }
+        .payer-slider input:checked + .slider-label::after { left: calc(100% - 41px); }
+        .payer-slider .slider-label span { z-index: 1; font-weight: 600; font-size: 14px; transition: color 0.3s ease; }
+        .payer-slider .slider-label .label-me { color: #2c3e50; }
+        .payer-slider .slider-label .label-wife { color: #8898aa; }
+        .payer-slider input:checked + .slider-label .label-me { color: #e1e8ed; }
+        .payer-slider input:checked + .slider-label .label-wife { color: white; }
+
         @media (max-width: 768px) {
             .container { padding: 0 10px; }
             .content { padding: 20px 15px; }
@@ -183,20 +197,14 @@
                 <div id="add-tab" class="tab-content">
                     <form id="expense-form">
                         <div class="form-group"><label for="date">Date</label><input type="date" id="date" required></div>
-                        <div class="form-group">
-                            <label for="category">Category</label>
-                            <select id="category" required><option value="">Select Category</option></select>
-                        </div>
-                        <div class="form-group"><label for="amount">Amount (MYR)</label><input type="number" id="amount" step="0.01" placeholder="0.00" required></div>
-                        <div class="form-group"><label for="description">Description</label><textarea id="description" rows="3" placeholder="Enter expense details..."></textarea></div>
+                        <div class="form-group"><label for="category">Category</label><select id="category" required><option value="">Select Category</option></select></div>
                         
-                        <div class="form-group">
-                            <label>Paid By</label>
-                            <div style="display: flex; gap: 20px; align-items: center;">
-                                <label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="paidBy" value="Me" checked> Me</label>
-                                <label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="paidBy" value="Wife"> Wife</label>
-                            </div>
+                        <div class="amount-payer-group form-group">
+                            <div class="form-group" style="margin: 0;"><label for="amount">Amount (MYR)</label><input type="number" id="amount" step="0.01" placeholder="0.00" required></div>
+                            <div class="payer-slider-container"><label>Paid By</label><div class="payer-slider"><input type="checkbox" id="paidBy-slider"><label for="paidBy-slider" class="slider-label"><span class="label-me">Me</span><span class="label-wife">Wife</span></label></div></div>
                         </div>
+
+                        <div class="form-group"><label for="description">Description</label><textarea id="description" rows="3" placeholder="Enter expense details..."></textarea></div>
 
                         <div class="form-group" id="add-image-source-selector">
                             <label>Image Source (Optional)</label>
@@ -312,7 +320,7 @@
     
     <div id="image-modal" class="modal-overlay" onclick="hideImageModal()"><div class="modal-content" style="padding: 10px; max-width: 90vw; max-height: 90vh; background: none; box-shadow: none;" onclick="event.stopPropagation()"><button class="modal-close-btn" onclick="hideImageModal()">&times;</button><img id="image-modal-img" src="" alt="Full-size Image" style="max-width: 100%; max-height: calc(90vh - 20px); display: block; margin: auto;"></div></div>
     <div id="edit-category-modal" class="modal-overlay"><div class="modal-content" style="padding:0;"><div class="modal-header"><h2>Edit Category</h2><button class="modal-close-btn" onclick="hideEditModal()">&times;</button></div><form id="edit-category-form"><div class="modal-body"><input type="hidden" id="edit-category-id"><div class="form-group"><label for="edit-category-name">Category Name</label><input type="text" id="edit-category-name" required></div><div class="form-group"><label>Choose an Icon</label><div id="edit-icon-preset-grid"></div><input type="hidden" id="edit-selected-icon" required></div></div><div class="modal-buttons"><button type="submit" class="btn">Save Changes</button><button type="button" class="btn" style="background: #6c757d;" onclick="hideEditModal()">Cancel</button></div></form></div></div>
-    <div id="edit-expense-modal" class="modal-overlay"><div class="modal-content" style="padding:0;"><form id="edit-expense-form"><div class="modal-header"><h2>Edit Expense</h2><button type="button" class="modal-close-btn" onclick="hideEditExpenseModal()">&times;</button></div><div class="modal-body"><input type="hidden" id="edit-expense-id"><input type="hidden" id="hidden-edit-pasted-image-url"><div class="form-group"><label for="edit-date">Date</label><input type="date" id="edit-date" required></div><div class="form-group"><label for="edit-category">Category</label><select id="edit-category" required></select></div><div class="form-group"><label for="edit-amount">Amount (MYR)</label><input type="number" id="edit-amount" step="0.01" required></div><div class="form-group"><label for="edit-description">Description</label><textarea id="edit-description" rows="3"></textarea></div><div class="form-group"><label>Paid By</label><div style="display: flex; gap: 20px; align-items: center;"><label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="editPaidBy" value="Me"> Me</label><label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="editPaidBy" value="Wife"> Wife</label></div></div><div class="form-group" id="edit-image-source-selector"><label>Image Source (Optional)</label><div style="display: flex; gap: 20px; align-items: center; margin-bottom: 10px;"><label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="edit-image-source" value="upload" checked> Upload Image</label><label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="edit-image-source" value="paste"> Paste Image</label></div></div><div class="form-group"><div id="edit-image-upload-container"><div class="file-upload"><input type="file" id="edit-pasted-image-upload" accept="image/*"><label for="edit-pasted-image-upload" class="file-upload-label"><span>🎨 Click to Upload Image</span></label></div></div><div id="edit-image-paste-container" style="display: none;"><div class="file-upload"><div id="edit-paste-image-box" class="file-upload-label" contenteditable="true"></div></div></div><div class="progress-bar-container" id="edit-image-progress-container"><div class="progress-bar" id="edit-image-progress-bar"></div></div><div id="edit-pasted-image-preview-container" style="display:none; margin-top: 10px; text-align: center;"></div></div><div class="form-group"><label>Upload Receipt/Proof</label><div id="existing-receipt-container" style="display:none;"><a id="existing-receipt-link" href="#" target="_blank" rel="noopener noreferrer" class="receipt-link">View Current Receipt</a><button type="button" id="remove-receipt-btn" class="delete-btn">Remove Receipt</button></div><div class="file-upload"><input type="file" id="edit-receipt" accept="image/*,.pdf"><label for="edit-receipt" class="file-upload-label" id="edit-file-label"><span id="edit-file-label-default">📁 Click to upload a new receipt</span><span id="edit-file-label-selected" style="display: none;"></span></label></div><div class="progress-bar-container" id="edit-progress-container"><div class="progress-bar" id="edit-progress-bar"></div></div></div></div><div class="modal-buttons"><button type="submit" class="btn">Save Changes</button><button type="button" class="btn" style="background: #6c757d;" onclick="hideEditExpenseModal()">Cancel</button></div></form></div></div>
+    <div id="edit-expense-modal" class="modal-overlay"><div class="modal-content" style="padding:0;"><form id="edit-expense-form"><div class="modal-header"><h2>Edit Expense</h2><button type="button" class="modal-close-btn" onclick="hideEditExpenseModal()">&times;</button></div><div class="modal-body"><input type="hidden" id="edit-expense-id"><input type="hidden" id="hidden-edit-pasted-image-url"><div class="form-group"><label for="edit-date">Date</label><input type="date" id="edit-date" required></div><div class="form-group"><label for="edit-category">Category</label><select id="edit-category" required></select></div><div class="amount-payer-group form-group"><div class="form-group" style="margin: 0;"><label for="edit-amount">Amount (MYR)</label><input type="number" id="edit-amount" step="0.01" required></div><div class="payer-slider-container"><label>Paid By</label><div class="payer-slider"><input type="checkbox" id="edit-paidBy-slider"><label for="edit-paidBy-slider" class="slider-label"><span class="label-me">Me</span><span class="label-wife">Wife</span></label></div></div></div><div class="form-group"><label for="edit-description">Description</label><textarea id="edit-description" rows="3"></textarea></div><div class="form-group" id="edit-image-source-selector"><label>Image Source (Optional)</label><div style="display: flex; gap: 20px; align-items: center; margin-bottom: 10px;"><label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="edit-image-source" value="upload" checked> Upload Image</label><label style="font-weight: normal; margin-bottom: 0;"><input type="radio" name="edit-image-source" value="paste"> Paste Image</label></div></div><div class="form-group"><div id="edit-image-upload-container"><div class="file-upload"><input type="file" id="edit-pasted-image-upload" accept="image/*"><label for="edit-pasted-image-upload" class="file-upload-label"><span>🎨 Click to Upload Image</span></label></div></div><div id="edit-image-paste-container" style="display: none;"><div class="file-upload"><div id="edit-paste-image-box" class="file-upload-label" contenteditable="true"></div></div></div><div class="progress-bar-container" id="edit-image-progress-container"><div class="progress-bar" id="edit-image-progress-bar"></div></div><div id="edit-pasted-image-preview-container" style="display:none; margin-top: 10px; text-align: center;"></div></div><div class="form-group"><label>Upload Receipt/Proof</label><div id="existing-receipt-container" style="display:none;"><a id="existing-receipt-link" href="#" target="_blank" rel="noopener noreferrer" class="receipt-link">View Current Receipt</a><button type="button" id="remove-receipt-btn" class="delete-btn">Remove Receipt</button></div><div class="file-upload"><input type="file" id="edit-receipt" accept="image/*,.pdf"><label for="edit-receipt" class="file-upload-label" id="edit-file-label"><span id="edit-file-label-default">📁 Click to upload a new receipt</span><span id="edit-file-label-selected" style="display: none;"></span></label></div><div class="progress-bar-container" id="edit-progress-container"><div class="progress-bar" id="edit-progress-bar"></div></div></div></div><div class="modal-buttons"><button type="submit" class="btn">Save Changes</button><button type="button" class="btn" style="background: #6c757d;" onclick="hideEditExpenseModal()">Cancel</button></div></form></div></div>
     <div id="edit-owed-modal" class="modal-overlay"><div class="modal-content" style="padding:0;"><div class="modal-header"><h2>Edit Owed Entry</h2><button class="modal-close-btn" onclick="hideEditOwedModal()">&times;</button></div><form id="edit-owed-form"><div class="modal-body"><input type="hidden" id="edit-owed-id"><div class="form-group"><label for="edit-owed-person">Who Owes You?</label><input type="text" id="edit-owed-person" required></div><div class="form-group"><label for="edit-owed-amount">Amount (MYR)</label><input type="number" id="edit-owed-amount" step="0.01" required></div><div class="form-group"><label for="edit-owed-description">Description</label><textarea id="edit-owed-description" rows="2"></textarea></div></div><div class="modal-buttons"><button type="submit" class="btn">Save Changes</button><button type="button" class="btn" style="background: #6c757d;" onclick="hideEditOwedModal()">Cancel</button></div></form></div></div>
 
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
@@ -451,7 +459,7 @@
                 category: document.getElementById('category').value, 
                 amount: parseFloat(document.getElementById('amount').value), 
                 description: document.getElementById('description').value, 
-                paidBy: document.querySelector('input[name="paidBy"]:checked').value,
+                paidBy: document.getElementById('paidBy-slider').checked ? 'Wife' : 'Me',
                 receipt: receiptURL, 
                 pastedImage: pastedImageURL,
                 timestamp: new Date().toISOString() 
@@ -942,7 +950,7 @@
             document.getElementById('edit-date').value = expense.date;
             document.getElementById('edit-amount').value = expense.amount;
             document.getElementById('edit-description').value = expense.description;
-            document.querySelector(`input[name="editPaidBy"][value="${expense.paidBy || 'Me'}"]`).checked = true;
+            document.getElementById('edit-paidBy-slider').checked = expense.paidBy === 'Wife';
             document.getElementById('hidden-edit-pasted-image-url').value = expense.pastedImage || '';
 
             if (expense.pastedImage) {
@@ -986,15 +994,17 @@
             if (!isViewOnlyMode) return;
             document.getElementById('header-subtitle').textContent = "View-Only Access";
 
-            // Hide tabs
-            document.querySelector('.tab[data-tab-name="add"]').style.display = 'none';
-            document.querySelector('.tab[data-tab-name="budget"]').style.display = 'none';
-            document.querySelector('.tab[data-tab-name="owed"]').style.display = 'none';
-            document.querySelector('.tab[data-tab-name="categories"]').style.display = 'none';
+            document.querySelectorAll('.tab').forEach(tab => {
+                const tabName = tab.dataset.tabName;
+                if (tabName !== 'summary' && tabName !== 'view') {
+                    tab.style.display = 'none';
+                }
+            });
 
-            // Hide specific UI elements
             document.getElementById('salary-section').style.display = 'none';
-            document.querySelector('.export-btn').style.display = 'none';
+            if (document.querySelector('.export-btn')) {
+                document.querySelector('.export-btn').style.display = 'none';
+            }
             
             document.querySelector('.tab[data-tab-name="summary"]').click();
         }
@@ -1041,7 +1051,7 @@
                     category: document.getElementById('edit-category').value, 
                     amount: parseFloat(document.getElementById('edit-amount').value), 
                     description: document.getElementById('edit-description').value, 
-                    paidBy: document.querySelector('input[name="editPaidBy"]:checked').value,
+                    paidBy: document.getElementById('edit-paidBy-slider').checked ? 'Wife' : 'Me',
                     receipt: newReceiptURL,
                     pastedImage: document.getElementById('hidden-edit-pasted-image-url').value || null
                 };
